@@ -68,3 +68,11 @@ Leaflet (the map library) is bundled in `web/vendor/` so the app loads on slow c
 ## Contribute
 
 See the [website](https://adt-community.github.io) for how bounties and goals work, then pick an open issue in this repo.
+
+## License
+
+[GNU AGPL-3.0](LICENSE). You can use, study, change and share this code. If you run a modified version as a service for others, you must publish your changes under the same license.
+
+By contributing, you agree your contributions are licensed under the same terms.
+
+Third-party code: [Leaflet](https://leafletjs.com) in `web/vendor/leaflet/` is under its own BSD-2-Clause license (see the `LICENSE` file there). Map data © OpenStreetMap contributors.
