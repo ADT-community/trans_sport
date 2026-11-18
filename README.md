@@ -18,6 +18,20 @@ Most trips in African cities are on informal minibuses (matatus, danfos, trotros
 
 **Build order:** owner dashboard + driver app first (owners pay, and drivers' GPS feeds everything else), then the passenger app.
 
+## Web app (`web/`)
+
+A mobile web app with three views, switched from the bottom tabs:
+
+- **Ride (passengers):** live map of minibuses, nearest buses with arrival time, fare and free seats. Tap one for details, **pay by mobile money** or **share the trip** with a friend (shared links open straight to that bus).
+- **Drive (drivers):** start/end shift, which shares the phone's **live GPS** only while on shift. Record **cash fares** in one tap, **request mobile money** with a pay code, count passengers on board, finish trips, and see today's trips and takings.
+- **Owner:** today's takings, active vehicles, passengers and mobile money share, a fleet map, every vehicle's status and earnings, and a **driver table** that flags top performers and drivers to check on.
+
+Out of the box it runs in **demo mode** with simulated minibuses on four Lagos routes (`web/sim.js`; coordinates are approximate). Set `apiUrl` in `web/config.js` to send real GPS pings (`POST /locations`) and fares (`POST /fares`) to a backend.
+
+Leaflet (the map library) is bundled in `web/vendor/` so the app loads on slow connections. OpenStreetMap's public tiles are fine for testing; switch `tileUrl` to a paid tile provider before launch.
+
+**Try it:** serve `web/` (for example `npx serve web`) and open it on a phone. GPS needs `https` or `localhost`.
+
 ## How it earns
 
 - Monthly fee per vehicle from owners
@@ -42,6 +56,7 @@ Most trips in African cities are on informal minibuses (matatus, danfos, trotros
 
 ## Starter tasks (bounty candidates)
 
+- [x] Web prototype: passenger map, driver app and owner dashboard on simulated data (`web/`)
 - [ ] Data model for vehicles, drivers, owners, routes, trips and fares
 - [ ] Driver app: sign in and share GPS in the background, battery-friendly
 - [ ] Backend endpoint to receive and store location pings
