@@ -56,6 +56,7 @@ Leaflet (the map library) is bundled in `web/vendor/` so the app loads on slow c
 
 ## Starter tasks (bounty candidates)
 
+- [ ] **Design bounty:** replace the placeholder minimal design with a proper design system and screens (`web/styles.css`)
 - [x] Web prototype: passenger map, driver app and owner dashboard on simulated data (`web/`)
 - [ ] Data model for vehicles, drivers, owners, routes, trips and fares
 - [ ] Driver app: sign in and share GPS in the background, battery-friendly

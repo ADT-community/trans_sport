@@ -6,15 +6,15 @@
   "use strict";
 
   const ROUTES = [
-    { id: "A", name: "Ikeja → Oshodi → Mile 2", color: "#e8a33d", fare: 500, stops: [
+    { id: "A", name: "Ikeja → Oshodi → Mile 2", color: "#c2410c", fare: 500, stops: [
       ["Ikeja Along", 6.6018, 3.3515], ["Ikeja Bus Stop", 6.5960, 3.3440], ["Oshodi", 6.5550, 3.3430],
       ["Ilasamaja", 6.5338, 3.3401], ["Cele", 6.5136, 3.3375], ["Ijesha", 6.4990, 3.3360], ["Mile 2", 6.4637, 3.3070]] },
-    { id: "B", name: "Yaba → Obalende → CMS", color: "#5fae7a", fare: 400, stops: [
+    { id: "B", name: "Yaba → Obalende → CMS", color: "#15803d", fare: 400, stops: [
       ["Yaba", 6.5095, 3.3711], ["Ebute Metta", 6.4882, 3.3790], ["Costain", 6.4800, 3.3740],
       ["Obalende", 6.4500, 3.4040], ["CMS", 6.4532, 3.3925]] },
-    { id: "C", name: "Ojota → Ketu → Mile 12", color: "#6ea8e8", fare: 300, stops: [
+    { id: "C", name: "Ojota → Ketu → Mile 12", color: "#1d4ed8", fare: 300, stops: [
       ["Ojota", 6.5866, 3.3800], ["Ketu", 6.5968, 3.3893], ["Mile 12", 6.6063, 3.3998]] },
-    { id: "D", name: "Lekki Phase 1 → Ajah", color: "#d4603a", fare: 700, stops: [
+    { id: "D", name: "Lekki Phase 1 → Ajah", color: "#7e22ce", fare: 700, stops: [
       ["Lekki Phase 1", 6.4474, 3.4723], ["Chevron", 6.4360, 3.5250], ["Jakande", 6.4460, 3.5420],
       ["Ajah", 6.4672, 3.5714]] }
   ];
