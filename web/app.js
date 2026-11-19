@@ -42,11 +42,18 @@
     L.tileLayer(CFG.tileUrl, { maxZoom: 18, attribution: CFG.tileAttribution }).addTo(map);
     return map;
   }
+  function isStale(v) {
+    return v.status === "offline" || (Date.now() - v.lastSeen > 5 * 60 * 1000);
+  }
+
   function busIcon(v, selected) {
     const mine = v.isMine || (driver.onShift && v === driver.v);
+    const stale = isStale(v);
+    const idle = v.status === "idle";
+    const statusClass = stale ? " stale" : idle ? " idle" : "";
     return L.divIcon({
       className: "", iconSize: [0, 0],
-      html: `<div class="bus${selected ? " sel" : ""}${mine ? " mine" : ""}" style="--c:${v.route.color}"><i>${v.route.id}</i>${esc(v.plate.split(" ")[1])}</div>`
+      html: `<div class="bus${selected ? " sel" : ""}${mine ? " mine" : ""}${statusClass}" style="--c:${stale ? "var(--muted)" : v.route.color}"><i>${v.route.id}</i>${esc(v.plate.split(" ")[1])}</div>`
     });
   }
 
@@ -55,8 +62,11 @@
   document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("active", x === b));
     Object.entries(views).forEach(([k, el]) => el.classList.toggle("active", k === b.dataset.view));
-    if (b.dataset.view === "ride") setTimeout(() => ride.map.invalidateSize(), 0);
-    if (b.dataset.view === "owner") setTimeout(() => { owner.map.invalidateSize(); owner.fit(); }, 0);
+    const isOwner = b.dataset.view === "owner";
+    const appEl = document.querySelector(".app");
+    if (appEl) appEl.classList.toggle("owner-mode", isOwner);
+    if (b.dataset.view === "ride") setTimeout(() => ride.map && ride.map.invalidateSize(), 0);
+    if (isOwner) setTimeout(() => { owner.map && owner.map.invalidateSize(); owner.fit && owner.fit(); }, 0);
     render();
   }));
 
@@ -311,7 +321,151 @@
   /* =====================================================================
    * OWNER
    * ===================================================================== */
-  const owner = { map: null, markers: new Map(), fitted: false };
+  const owner = {
+    map: null,
+    markers: new Map(),
+    fitted: false,
+    activeTab: "overview",
+    mapFilter: "all",
+    vFilter: "all",
+    search: "",
+    selectedVehicleId: null,
+    earnPeriod: 7
+  };
+
+  function ago(ts, status) {
+    if (status === "offline") return "offline (15 min ago)";
+    const s = Math.round((Date.now() - ts) / 1000);
+    if (s < 30) return "live";
+    if (s < 300) return `${Math.round(s / 60)} min ago`;
+    if (s < 3600) return `${Math.round(s / 60)} min ago (stale)`;
+    return "over an hour ago (stale)";
+  }
+
+  function getStatusBadge(v) {
+    if (v.status === "offline") return '<span class="status-badge offline">Offline</span>';
+    if (isStale(v)) return '<span class="status-badge stale">Stale (&gt;5m)</span>';
+    if (v.status === "idle") return '<span class="status-badge idle">Idle</span>';
+    return '<span class="status-badge active">Active</span>';
+  }
+
+  function switchOwnerTab(tabName) {
+    owner.activeTab = tabName;
+    document.querySelectorAll(".owner-nav-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.ownerTab === tabName);
+    });
+    const screens = {
+      overview: $("#ownerScreenOverview"),
+      map: $("#ownerScreenMap"),
+      vehicles: $("#ownerScreenVehicles"),
+      drivers: $("#ownerScreenDrivers"),
+      earnings: $("#ownerScreenEarnings"),
+      billing: $("#ownerScreenBilling")
+    };
+    Object.entries(screens).forEach(([name, el]) => {
+      if (!el) return;
+      const isTarget = name === tabName;
+      el.hidden = !isTarget;
+      el.classList.toggle("active", isTarget);
+    });
+    if (tabName === "map") {
+      setTimeout(() => {
+        if (owner.map) {
+          owner.map.invalidateSize();
+          owner.fit();
+        }
+      }, 50);
+    }
+    renderOwner();
+  }
+
+  function openVehicleDetail(v) {
+    owner.selectedVehicleId = v.id;
+    switchOwnerTab("vehicles");
+    const listEl = $("#vehiclesListView");
+    const detailEl = $("#vehicleDetailView");
+    if (listEl) listEl.hidden = true;
+    if (detailEl) detailEl.hidden = false;
+    renderVehicleDetail(v);
+  }
+
+  function closeVehicleDetail() {
+    owner.selectedVehicleId = null;
+    const listEl = $("#vehiclesListView");
+    const detailEl = $("#vehicleDetailView");
+    if (listEl) listEl.hidden = false;
+    if (detailEl) detailEl.hidden = true;
+    renderVehiclesScreen();
+  }
+
+  function renderVehicleDetail(v) {
+    if (!v) return;
+    const takings = v.today.cash + v.today.digital;
+    const cashPct = takings ? Math.round((v.today.cash / takings) * 100) : 0;
+    const digitalPct = takings ? 100 - cashPct : 0;
+
+    $("#vdRouteBadge").textContent = v.route.id;
+    $("#vdRouteBadge").style.backgroundColor = v.route.color;
+    $("#vdPlate").textContent = v.plate;
+    $("#vdRouteName").textContent = v.route.name;
+    $("#vdStatusBadge").innerHTML = getStatusBadge(v);
+    $("#vdLastSeen").textContent = ago(v.lastSeen, v.status);
+
+    $("#vdTakings").textContent = money(takings);
+    $("#vdTrips").textContent = v.today.trips;
+    $("#vdHours").textContent = `${v.today.hours.toFixed(1)}h`;
+    $("#vdOnboard").textContent = `${v.onboard} / ${v.seats} seats`;
+
+    $("#vdCashBar").style.width = `${cashPct}%`;
+    $("#vdDigitalBar").style.width = `${digitalPct}%`;
+    $("#vdCashVal").textContent = money(v.today.cash);
+    $("#vdCashPct").textContent = `(${cashPct}%)`;
+    $("#vdDigitalVal").textContent = money(v.today.digital);
+    $("#vdDigitalPct").textContent = `(${digitalPct}%)`;
+
+    // 7-day mini chart
+    const history7 = [...(v.historyPast6 || []), takings];
+    const maxVal = Math.max(...history7, 1000);
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const now = new Date();
+    const dayLabels = [];
+    for (let i = 6; i >= 0; i--) {
+      if (i === 0) dayLabels.push("Today");
+      else {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        dayLabels.push(dayNames[d.getDay()]);
+      }
+    }
+    const barsHtml = history7.map((val, idx) => {
+      const heightPct = Math.round((val / maxVal) * 100);
+      const isToday = idx === 6;
+      return `<div class="vd-bar-col">
+        <div class="vd-bar-fill-wrap">
+          <div class="vd-bar-fill${isToday ? " is-today" : ""}" style="height:${heightPct}%" title="${dayLabels[idx]}: ${money(val)}"></div>
+        </div>
+        <span class="vd-bar-label">${dayLabels[idx]}</span>
+        <span class="vd-bar-val">${money(val)}</span>
+      </div>`;
+    }).join("");
+    $("#vd7dChart").innerHTML = `<div class="vd-chart-row">${barsHtml}</div>`;
+
+    // Driver card
+    const initials = v.driver.split(" ").map((n) => n[0]).join("");
+    $("#vdDriverAvatar").textContent = initials;
+    $("#vdDriverName").textContent = v.driver;
+    $("#vdDriverStats").textContent = `${money(takings)} takings · ${v.today.trips} trips · ${v.today.hours.toFixed(1)}h on road`;
+
+    $("#vdCenterMapBtn").onclick = () => {
+      switchOwnerTab("map");
+      setTimeout(() => {
+        if (owner.map) {
+          owner.map.setView(v.pos, 15);
+        }
+      }, 100);
+      toast(`Centered on ${v.plate}`);
+    };
+  }
 
   function initOwner() {
     owner.map = makeMap("ownerMap", { attributionControl: true });
@@ -321,60 +475,556 @@
       owner.fitted = true;
       owner.map.fitBounds(L.latLngBounds(ROUTES.flatMap((r) => r.points)), { padding: [16, 16] });
     };
+
+    // Sub-tab navigation
+    document.querySelectorAll(".owner-nav-btn").forEach((btn) => {
+      btn.addEventListener("click", () => switchOwnerTab(btn.dataset.ownerTab));
+    });
+
+    // Overview buttons
+    $("#btnGoToMap")?.addEventListener("click", () => switchOwnerTab("map"));
+    $("#btnGoToVehicles")?.addEventListener("click", () => switchOwnerTab("vehicles"));
+    $("#topVehicleAction")?.addEventListener("click", () => {
+      const sorted = [...vehicles].sort((a, b) => (b.today.cash + b.today.digital) - (a.today.cash + a.today.digital));
+      if (sorted[0]) openVehicleDetail(sorted[0]);
+    });
+    $("#bottomVehicleAction")?.addEventListener("click", () => {
+      const offline = vehicles.find((v) => v.status === "offline") || vehicles.find(isStale);
+      const sorted = [...vehicles].sort((a, b) => (a.today.cash + a.today.digital) - (b.today.cash + b.today.digital));
+      openVehicleDetail(offline || sorted[0]);
+    });
+
+    // Map filters
+    document.querySelectorAll("[data-map-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-map-filter]").forEach((b) => b.classList.toggle("active", b === btn));
+        owner.mapFilter = btn.dataset.mapFilter;
+        renderMapScreen();
+      });
+    });
+
+    // Vehicle list filters & search
+    document.querySelectorAll("[data-v-filter]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-v-filter]").forEach((b) => b.classList.toggle("active", b === btn));
+        owner.vFilter = btn.dataset.vFilter;
+        renderVehiclesScreen();
+      });
+    });
+    $("#vehicleSearchInput")?.addEventListener("input", (e) => {
+      owner.search = e.target.value.toLowerCase().trim();
+      renderVehiclesScreen();
+    });
+    $("#resetVehiclesFilter")?.addEventListener("click", () => {
+      owner.search = "";
+      owner.vFilter = "all";
+      const searchInput = $("#vehicleSearchInput");
+      if (searchInput) searchInput.value = "";
+      document.querySelectorAll("[data-v-filter]").forEach((b) => b.classList.toggle("active", b.dataset.vFilter === "all"));
+      renderVehiclesScreen();
+    });
+
+    // Vehicle Detail back button
+    $("#backToVehiclesBtn")?.addEventListener("click", closeVehicleDetail);
+
+    // Earnings period buttons
+    $("#btnEarn7d")?.addEventListener("click", () => {
+      owner.earnPeriod = 7;
+      $("#btnEarn7d").classList.add("active");
+      $("#btnEarn30d").classList.remove("active");
+      $("#earnPeriodLabel").textContent = "Last 7 days (including today)";
+      $("#thPeriodTotal").textContent = "7-Day Total";
+      renderEarningsScreen();
+    });
+    $("#btnEarn30d")?.addEventListener("click", () => {
+      owner.earnPeriod = 30;
+      $("#btnEarn30d").classList.add("active");
+      $("#btnEarn7d").classList.remove("active");
+      $("#earnPeriodLabel").textContent = "Last 30 days (estimated)";
+      $("#thPeriodTotal").textContent = "30-Day Total";
+      renderEarningsScreen();
+    });
+
+    // Billing modals & actions
+    $("#btnUpdatePayment")?.addEventListener("click", () => {
+      openModal("Update Payment Method", `
+        <p>Update your fleet auto-debit mobile money account.</p>
+        <label for="billPhone">Mobile Money Phone Number</label>
+        <input id="billPhone" type="tel" value="08038924821" placeholder="080 0000 0000">
+        <label for="billProvider">Provider</label>
+        <select id="billProvider"><option selected>MTN MoMo</option><option>OPay</option><option>PalmPay</option><option>Moniepoint</option></select>
+        <div class="actions">
+          <button class="btn" data-close>Cancel</button>
+          <button class="btn primary" id="savePaymentBtn">Save Changes</button>
+        </div>`, (body) => {
+        body.querySelector("#savePaymentBtn")?.addEventListener("click", () => {
+          closeModal();
+          toast("Payment method updated successfully");
+        });
+      });
+    });
+
+    document.querySelectorAll("[data-download-stmt]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const id = e.target.dataset.downloadStmt;
+        openModal(`Statement #${id}`, `
+          <div class="statement-modal-body">
+            <p><strong>Ade Transport Ltd</strong> · Fleet Pilot (8 Vehicles)</p>
+            <p class="muted small">Coverage: Lagos Mainland Danfo Routes</p>
+            <hr style="margin:12px 0; border:0; border-top:1px solid var(--line);">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span>8x Fleet Platform Access</span><b>₦80,000</b></div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; color:var(--ok);"><span>Pilot Trial Discount (100%)</span><b>-₦80,000</b></div>
+            <hr style="margin:12px 0; border:0; border-top:1px solid var(--line);">
+            <div style="display:flex; justify-content:space-between; font-weight:700; font-size:16px;"><span>Total Due</span><b>₦0</b></div>
+            <p class="muted small" style="margin-top:12px;">Paid via Trial Waiver · Status: Settled</p>
+            <div class="actions" style="margin-top:16px;">
+              <button class="btn primary" data-close>Close</button>
+            </div>
+          </div>
+        `);
+      });
+    });
   }
 
-  function ago(ts, status) {
-    if (status === "offline") return "offline";
-    const s = Math.round((Date.now() - ts) / 1000);
-    return s < 30 ? "live" : s < 3600 ? `${Math.round(s / 60)} min ago` : "over an hour ago";
-  }
-
-  function renderOwner() {
-    const total = vehicles.reduce((a, v) => a + v.today.cash + v.today.digital, 0);
-    const digital = vehicles.reduce((a, v) => a + v.today.digital, 0);
-    const active = vehicles.filter((v) => v.status === "active").length;
+  function renderOverviewScreen(total, active, digital) {
     $("#oTakings").textContent = money(total);
     $("#oActive").textContent = `${active}/${vehicles.length}`;
     $("#oPax").textContent = vehicles.reduce((a, v) => a + v.today.pax, 0).toLocaleString(CFG.locale);
     $("#oDigital").textContent = total ? Math.round((digital / total) * 100) + "%" : "0%";
+    const totalTrips = vehicles.reduce((a, v) => a + v.today.trips, 0);
+    const tripsEl = $("#oTrips");
+    if (tripsEl) tripsEl.textContent = totalTrips;
 
-    for (const v of vehicles) {
-      let m = owner.markers.get(v.id);
-      if (v.status === "offline") { if (m) { m.remove(); owner.markers.delete(v.id); } continue; }
-      if (!m) { m = L.marker(v.pos, { icon: busIcon(v, false) }).addTo(owner.map); owner.markers.set(v.id, m); }
-      m.setLatLng(v.pos);
+    // Top Vehicle
+    const sorted = [...vehicles].sort((a, b) => (b.today.cash + b.today.digital) - (a.today.cash + a.today.digital));
+    const topV = sorted[0];
+    if (topV) {
+      const topTakings = topV.today.cash + topV.today.digital;
+      $("#topVehiclePlate").textContent = topV.plate;
+      $("#topVehicleDriver").textContent = `Driver: ${topV.driver} · Route ${topV.route.id}`;
+      $("#topVehicleTakings").textContent = money(topTakings);
+      $("#topVehicleTrips").textContent = `${topV.today.trips} trips completed`;
     }
 
+    // Bottom / Attention Vehicle
+    const offlineV = vehicles.find((v) => v.status === "offline") || vehicles.find(isStale);
+    const bottomV = offlineV || sorted[sorted.length - 1];
+    if (bottomV) {
+      const botTakings = bottomV.today.cash + bottomV.today.digital;
+      $("#bottomVehiclePlate").textContent = bottomV.plate;
+      $("#bottomVehicleDriver").textContent = `Driver: ${bottomV.driver} · Route ${bottomV.route.id}`;
+      $("#bottomVehicleTakings").textContent = money(botTakings);
+      $("#bottomVehicleReason").textContent = bottomV.status === "offline" ? "Offline (stale 15m)" : isStale(bottomV) ? "Stale (>5m no ping)" : "Lowest takings today";
+    }
+
+    // Overview Map Summary & Route chips
+    const mapSummary = $("#overviewMapSummary");
+    if (mapSummary) {
+      mapSummary.textContent = `${active} active vehicles moving live on Lagos routes`;
+    }
+    const routeChipsEl = $("#overviewRouteChips");
+    if (routeChipsEl && !routeChipsEl.dataset.built) {
+      routeChipsEl.dataset.built = "true";
+      routeChipsEl.innerHTML = ROUTES.map((r) => {
+        const rCount = vehicles.filter((v) => v.route.id === r.id && v.status === "active").length;
+        return `<span class="chip" style="display:inline-flex; align-items:center; gap:6px; font-size:12px; margin:2px 4px 2px 0;">
+          <b style="color:${r.color}">${r.id}</b> ${esc(r.name.split("→")[0].trim())} (${rCount} active)
+        </span>`;
+      }).join("");
+    }
+
+    // Fleet list
     const order = { active: 0, idle: 1, offline: 2 };
     $("#fleetList").innerHTML = [...vehicles].sort((a, b) => order[a.status] - order[b.status]).map((v) => `
       <button class="row" data-id="${v.id}" style="--c:${v.route.color}">
         <span class="badge">${v.route.id}</span>
         <span class="main"><b>${esc(v.plate)}${v === driver.v ? " · you" : ""}</b>
-          <span><i class="status-dot s-${v.status}"></i>${esc(v.driver)} · ${ago(v.lastSeen, v.status)}</span></span>
+          <span><i class="status-dot ${isStale(v) ? "s-offline" : v.status === "idle" ? "s-idle" : "s-active"}"></i>${esc(v.driver)} · ${ago(v.lastSeen, v.status)}</span></span>
         <span class="end"><b>${money(v.today.cash + v.today.digital)}</b><span>${v.today.trips} trips</span></span>
       </button>`).join("");
     $("#fleetList").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => {
       const v = vehicles.find((x) => x.id === b.dataset.id);
-      if (v.status === "offline") return toast(`${v.plate} is offline`);
-      owner.map.setView(v.pos, 14);
-      $("#ownerMap").scrollIntoView({ behavior: "smooth", block: "center" });
+      if (v) openVehicleDetail(v);
     }));
+  }
 
+  function renderMapScreen() {
+    const filter = owner.mapFilter;
+    const filterFn = (v) => {
+      const stale = isStale(v);
+      if (filter === "active") return v.status === "active" && !stale;
+      if (filter === "idle") return v.status === "idle" && !stale;
+      if (filter === "stale") return stale;
+      return true;
+    };
+
+    // Update counts
+    const countActive = vehicles.filter((v) => v.status === "active" && !isStale(v)).length;
+    const countIdle = vehicles.filter((v) => v.status === "idle" && !isStale(v)).length;
+    const countStale = vehicles.filter(isStale).length;
+    if ($("#countAll")) $("#countAll").textContent = String(vehicles.length);
+    if ($("#countActive")) $("#countActive").textContent = String(countActive);
+    if ($("#countIdle")) $("#countIdle").textContent = String(countIdle);
+    if ($("#countStale")) $("#countStale").textContent = String(countStale);
+
+    // Update markers on owner.map
+    if (owner.map) {
+      for (const v of vehicles) {
+        const visible = filterFn(v);
+        let m = owner.markers.get(v.id);
+        if (!visible) {
+          if (m) { m.remove(); owner.markers.delete(v.id); }
+          continue;
+        }
+        if (!m) {
+          m = L.marker(v.pos, { icon: busIcon(v, false) }).addTo(owner.map);
+          m.on("click", () => {
+            const takings = v.today.cash + v.today.digital;
+            const popupHtml = `<div style="min-width:160px; font-family:system-ui,sans-serif;">
+              <b>${esc(v.plate)}</b> · <span style="color:${v.route.color};font-weight:700;">${v.route.id}</span>
+              <p style="margin:4px 0 2px; font-size:12px; color:var(--muted);">${esc(v.driver)}</p>
+              <p style="margin:0 0 6px; font-size:12px;">Takings: <b>${money(takings)}</b></p>
+              <p style="margin:0 0 8px; font-size:11px;">Status: ${ago(v.lastSeen, v.status)}</p>
+              <button class="btn small primary" style="width:100%; padding:4px 8px; font-size:12px;" onclick="window._openVD('${v.id}')">View Detail</button>
+            </div>`;
+            m.bindPopup(popupHtml).openPopup();
+          });
+          owner.markers.set(v.id, m);
+        }
+        m.setLatLng(v.pos);
+        m.setIcon(busIcon(v, false));
+      }
+    }
+
+    // Sidebar list
+    const sidebarEl = $("#mapVehicleList");
+    if (sidebarEl) {
+      const filtered = vehicles.filter(filterFn);
+      if (filtered.length === 0) {
+        sidebarEl.innerHTML = `<p class="muted small" style="padding:12px;">No vehicles match this filter.</p>`;
+      } else {
+        sidebarEl.innerHTML = filtered.map((v) => {
+          const takings = v.today.cash + v.today.digital;
+          const dotClass = isStale(v) ? "s-offline" : v.status === "idle" ? "s-idle" : "s-active";
+          return `<button class="map-sidebar-item" data-id="${v.id}" style="--c:${v.route.color}">
+            <span class="badge small">${v.route.id}</span>
+            <div class="msi-main">
+              <b>${esc(v.plate)}</b>
+              <span><i class="status-dot ${dotClass}"></i>${esc(v.driver)} · ${ago(v.lastSeen, v.status)}</span>
+            </div>
+            <div class="msi-end">
+              <b>${money(takings)}</b>
+              <span>${v.today.trips} trips</span>
+            </div>
+          </button>`;
+        }).join("");
+        sidebarEl.querySelectorAll(".map-sidebar-item").forEach((b) => {
+          b.addEventListener("click", () => {
+            const v = vehicles.find((x) => x.id === b.dataset.id);
+            if (v && owner.map) {
+              owner.map.setView(v.pos, 15);
+              const m = owner.markers.get(v.id);
+              if (m && m.openPopup) m.openPopup();
+              toast(`Centered on ${v.plate}`);
+            }
+          });
+        });
+      }
+    }
+  }
+
+  function renderVehiclesScreen() {
+    if (owner.selectedVehicleId) {
+      const v = vehicles.find((x) => x.id === owner.selectedVehicleId);
+      if (v) renderVehicleDetail(v);
+      return;
+    }
+    const filter = owner.vFilter;
+    const query = owner.search;
+    const filtered = vehicles.filter((v) => {
+      const stale = isStale(v);
+      if (filter === "active" && (v.status !== "active" || stale)) return false;
+      if (filter === "idle" && (v.status !== "idle" || stale)) return false;
+      if (filter === "offline" && !stale) return false;
+      if (query) {
+        const txt = `${v.plate} ${v.driver} ${v.route.name} ${v.route.id}`.toLowerCase();
+        if (!txt.includes(query)) return false;
+      }
+      return true;
+    });
+
+    const gridEl = $("#vehiclesGrid");
+    const emptyEl = $("#vehiclesEmptyState");
+    if (!gridEl) return;
+
+    if (filtered.length === 0) {
+      gridEl.innerHTML = "";
+      if (emptyEl) emptyEl.hidden = false;
+      return;
+    }
+    if (emptyEl) emptyEl.hidden = true;
+
+    gridEl.innerHTML = filtered.map((v) => {
+      const takings = v.today.cash + v.today.digital;
+      const cashPct = takings ? Math.round((v.today.cash / takings) * 100) : 0;
+      const digitalPct = takings ? 100 - cashPct : 0;
+      return `<div class="card vehicle-overview-card" style="--c:${v.route.color}">
+        <div class="voc-head">
+          <div class="voc-title">
+            <span class="badge">${v.route.id}</span>
+            <div>
+              <h3>${esc(v.plate)}</h3>
+              <p class="muted small">${esc(v.route.name)}</p>
+            </div>
+          </div>
+          ${getStatusBadge(v)}
+        </div>
+        <div class="voc-driver-row">
+          <span class="muted small">Driver: <b>${esc(v.driver)}</b></span>
+          <span class="muted small">${ago(v.lastSeen, v.status)}</span>
+        </div>
+        <div class="voc-stats">
+          <div class="voc-stat"><span class="k">Today's Takings</span><span class="v">${money(takings)}</span></div>
+          <div class="voc-stat"><span class="k">Trips / Hours</span><span class="v">${v.today.trips} / ${v.today.hours.toFixed(1)}h</span></div>
+          <div class="voc-stat"><span class="k">Onboard</span><span class="v">${v.onboard} / ${v.seats}</span></div>
+        </div>
+        <div class="voc-momo-bar">
+          <div class="momo-ratio-bar small">
+            <div class="momo-fill-cash" style="width:${cashPct}%" title="Cash: ${money(v.today.cash)} (${cashPct}%)"></div>
+            <div class="momo-fill-digital" style="width:${digitalPct}%" title="MoMo: ${money(v.today.digital)} (${digitalPct}%)"></div>
+          </div>
+          <div class="voc-momo-label">
+            <span>Cash: ${money(v.today.cash)} (${cashPct}%)</span>
+            <span>MoMo: ${money(v.today.digital)} (${digitalPct}%)</span>
+          </div>
+        </div>
+        <button class="btn small voc-action" data-detail-id="${v.id}">View Details →</button>
+      </div>`;
+    }).join("");
+
+    gridEl.querySelectorAll("[data-detail-id]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const v = vehicles.find((x) => x.id === btn.dataset.detailId);
+        if (v) openVehicleDetail(v);
+      });
+    });
+  }
+
+  function renderDriversScreen() {
     const rows = vehicles.map((v) => {
       const takings = v.today.cash + v.today.digital;
-      return { v, takings, perHour: takings / Math.max(0.5, v.today.hours) };
+      const perHour = takings / Math.max(0.5, v.today.hours);
+      return { v, takings, perHour };
     });
     const avg = rows.reduce((a, r) => a + r.perHour, 0) / rows.length;
     const best = Math.max(...rows.map((r) => r.perHour));
-    $("#driverTable").innerHTML = rows.sort((a, b) => b.takings - a.takings).map((r) => `
-      <tr>
-        <td>${esc(r.v.driver)}</td>
-        <td class="num">${r.v.today.trips}</td>
-        <td class="num">${money(r.takings)}</td>
-        <td class="num">${money(r.perHour)}</td>
-        <td>${r.perHour === best ? '<span class="flag top">Top</span>' : r.perHour < avg * 0.6 ? '<span class="flag low">Check</span>' : ""}</td>
-      </tr>`).join("");
+    const sorted = [...rows].sort((a, b) => b.takings - a.takings);
+
+    // KPIs
+    if ($("#drTotal")) $("#drTotal").textContent = vehicles.length;
+    if ($("#drActive")) $("#drActive").textContent = vehicles.filter((v) => v.status === "active").length;
+    if ($("#drAvgPerHour")) $("#drAvgPerHour").textContent = money(avg);
+    if ($("#drTopDriver") && sorted[0]) $("#drTopDriver").textContent = firstName(sorted[0].v.driver);
+
+    // Table
+    const tableEl = $("#driverTable");
+    if (tableEl) {
+      tableEl.innerHTML = sorted.map((r) => {
+        const isTop = r.perHour === best;
+        const isLow = r.perHour < avg * 0.6;
+        const flagHtml = isTop ? '<span class="flag top">Top Earner</span>' : isLow ? '<span class="flag low">Check</span>' : '<span class="flag ok">On Track</span>';
+        return `<tr data-v-id="${r.v.id}" style="cursor:pointer;" title="Click to view vehicle detail">
+          <td><b>${esc(r.v.driver)}</b></td>
+          <td><span class="badge small" style="background:${r.v.route.color}">${r.v.route.id}</span> ${esc(r.v.plate)}</td>
+          <td class="num">${r.v.today.trips}</td>
+          <td class="num">${r.v.today.hours.toFixed(1)}h</td>
+          <td class="num">${money(r.takings)}</td>
+          <td class="num">${money(r.perHour)}</td>
+          <td>${flagHtml}</td>
+        </tr>`;
+      }).join("");
+
+      tableEl.querySelectorAll("tr").forEach((tr) => {
+        tr.addEventListener("click", () => {
+          const v = vehicles.find((x) => x.id === tr.dataset.vId);
+          if (v) openVehicleDetail(v);
+        });
+      });
+    }
   }
+
+  function renderEarningsScreen() {
+    const period = owner.earnPeriod || 7;
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const now = new Date();
+
+    // Prepare daily sums across fleet
+    const dailyFleetTotals = [];
+    const dayLabels = [];
+
+    if (period === 7) {
+      for (let i = 6; i >= 0; i--) {
+        if (i === 0) dayLabels.push("Today");
+        else {
+          const d = new Date(now);
+          d.setDate(now.getDate() - i);
+          dayLabels.push(`${dayNames[d.getDay()]} ${d.getDate()}`);
+        }
+      }
+      for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+        let daySum = 0;
+        for (const v of vehicles) {
+          if (dayIdx === 6) {
+            daySum += (v.today.cash + v.today.digital);
+          } else {
+            daySum += (v.historyPast6 ? v.historyPast6[dayIdx] : 35000);
+          }
+        }
+        dailyFleetTotals.push(daySum);
+      }
+    } else {
+      // 30 days
+      for (let dayIdx = 0; dayIdx < 30; dayIdx++) {
+        const daysAgo = 29 - dayIdx;
+        if (daysAgo === 0) dayLabels.push("Today");
+        else {
+          const d = new Date(now);
+          d.setDate(now.getDate() - daysAgo);
+          dayLabels.push(`${dayNames[d.getDay()]} ${d.getDate()}`);
+        }
+        let daySum = 0;
+        for (const v of vehicles) {
+          if (daysAgo === 0) {
+            daySum += (v.today.cash + v.today.digital);
+          } else {
+            const base = (v.historyPast29Total ? v.historyPast29Total / 29 : 40000);
+            const varFactor = 0.85 + (((v.plate.charCodeAt(1) + dayIdx * 7) % 30) / 100);
+            daySum += Math.round(base * varFactor);
+          }
+        }
+        dailyFleetTotals.push(daySum);
+      }
+    }
+
+    const periodTotal = dailyFleetTotals.reduce((a, b) => a + b, 0);
+    const dailyAvg = periodTotal / period;
+    const maxDayVal = Math.max(...dailyFleetTotals, 1);
+    const bestDayIdx = dailyFleetTotals.indexOf(maxDayVal);
+    const bestDayLabel = `${dayLabels[bestDayIdx]}: ${money(maxDayVal)}`;
+
+    const totalToday = vehicles.reduce((a, v) => a + v.today.cash + v.today.digital, 0);
+    const digitalToday = vehicles.reduce((a, v) => a + v.today.digital, 0);
+    const digitalPct = totalToday ? Math.round((digitalToday / totalToday) * 100) : 0;
+
+    if ($("#earnTotal")) $("#earnTotal").textContent = money(periodTotal);
+    if ($("#earnDailyAvg")) $("#earnDailyAvg").textContent = money(dailyAvg);
+    if ($("#earnBestDay")) $("#earnBestDay").textContent = bestDayLabel;
+    if ($("#earnDigitalPct")) $("#earnDigitalPct").textContent = `${digitalPct}%`;
+
+    // Render SVG Trend Chart
+    const chartContainer = $("#fleetEarningsChart");
+    if (chartContainer) {
+      const W = 680, H = 220, padLeft = 45, padRight = 20, padTop = 30, padBottom = 35;
+      const chartW = W - padLeft - padRight;
+      const chartH = H - padTop - padBottom;
+      const step = chartW / dailyFleetTotals.length;
+      const barW = Math.max(8, Math.min(42, step * 0.65));
+
+      let gridSvg = "";
+      for (let g = 0; g <= 3; g++) {
+        const yVal = Math.round(maxDayVal * (g / 3));
+        const yPos = padTop + chartH - (g / 3) * chartH;
+        gridSvg += `<line x1="${padLeft}" y1="${yPos}" x2="${W - padRight}" y2="${yPos}" stroke="var(--line)" stroke-dasharray="3,3" />
+          <text x="${padLeft - 6}" y="${yPos + 4}" fill="var(--muted)" font-size="10" text-anchor="end">${money(yVal).replace("₦", "")}</text>`;
+      }
+
+      let barsSvg = "";
+      dailyFleetTotals.forEach((val, i) => {
+        const bH = (val / maxDayVal) * chartH;
+        const x = padLeft + i * step + (step - barW) / 2;
+        const y = padTop + chartH - bH;
+        const isToday = i === dailyFleetTotals.length - 1;
+        const barFill = isToday ? "var(--ok)" : "var(--text)";
+        const labelInterval = period === 30 ? (i % 5 === 0 || isToday) : true;
+        const lbl = labelInterval ? `<text x="${x + barW / 2}" y="${H - 12}" fill="var(--muted)" font-size="10" text-anchor="middle">${dayLabels[i].split(" ")[0]}</text>` : "";
+        barsSvg += `<g class="chart-bar-group" tabindex="0">
+          <title>${dayLabels[i]}: ${money(val)}</title>
+          <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(2, bH)}" fill="${barFill}" rx="3" />
+          ${lbl}
+          ${period === 7 ? `<text x="${x + barW / 2}" y="${Math.max(12, y - 6)}" fill="var(--text)" font-size="10" font-weight="600" text-anchor="middle">${money(val).replace("₦", "")}</text>` : ""}
+        </g>`;
+      });
+
+      chartContainer.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="xMidYMid meet" style="display:block; overflow:visible;">
+        ${gridSvg}
+        ${barsSvg}
+      </svg>`;
+    }
+
+    // Vehicle breakdown table
+    const tableEl = $("#earningsVehicleTable");
+    if (tableEl) {
+      tableEl.innerHTML = vehicles.map((v) => {
+        const takingsToday = v.today.cash + v.today.digital;
+        const v7 = [...(v.historyPast6 || []), takingsToday];
+        const vTotal = period === 7 ? v7.reduce((a, b) => a + b, 0) : ((v.historyPast29Total || 29 * 35000) + takingsToday);
+        const vAvg = vTotal / period;
+        const maxV = Math.max(...v7, 1);
+
+        // mini sparkline
+        const sparklineSvg = `<div style="display:inline-flex; align-items:flex-end; gap:3px; height:20px;">
+          ${v7.map((val, idx) => {
+            const h = Math.max(3, Math.round((val / maxV) * 20));
+            const color = idx === 6 ? "var(--ok)" : "var(--muted)";
+            return `<div style="width:5px; height:${h}px; background:${color}; border-radius:1px;" title="${money(val)}"></div>`;
+          }).join("")}
+        </div>`;
+
+        return `<tr data-v-id="${v.id}" style="cursor:pointer;" title="Click to view vehicle detail">
+          <td><span class="badge small" style="background:${v.route.color}">${v.route.id}</span> <b>${esc(v.plate)}</b></td>
+          <td>${esc(v.driver)}</td>
+          <td class="num">${money(takingsToday)}</td>
+          <td class="num"><b>${money(vTotal)}</b></td>
+          <td class="num">${money(vAvg)}</td>
+          <td>${sparklineSvg}</td>
+        </tr>`;
+      }).join("");
+
+      tableEl.querySelectorAll("tr").forEach((tr) => {
+        tr.addEventListener("click", () => {
+          const v = vehicles.find((x) => x.id === tr.dataset.vId);
+          if (v) openVehicleDetail(v);
+        });
+      });
+    }
+  }
+
+  function renderBillingScreen() {
+    const count = vehicles.length;
+    const monthlyRate = 10000;
+    const monthlyTotal = count * monthlyRate;
+    if ($("#billFleetSize")) $("#billFleetSize").textContent = `${count} vehicles`;
+    if ($("#billMonthlyTotal")) $("#billMonthlyTotal").textContent = `${money(monthlyTotal)} / month`;
+  }
+
+  function renderOwner() {
+    const total = vehicles.reduce((a, v) => a + v.today.cash + v.today.digital, 0);
+    const digital = vehicles.reduce((a, v) => a + v.today.digital, 0);
+    const active = vehicles.filter((v) => v.status === "active" && !isStale(v)).length;
+
+    renderOverviewScreen(total, active, digital);
+    renderMapScreen();
+    renderVehiclesScreen();
+    renderDriversScreen();
+    renderEarningsScreen();
+    renderBillingScreen();
+  }
+
+  // Global helper for Leaflet popups
+  window._openVD = (vid) => {
+    const v = vehicles.find((x) => x.id === vid);
+    if (v) openVehicleDetail(v);
+  };
 
   /* ---------- render loop ---------- */
   function render(force) {

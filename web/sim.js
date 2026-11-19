@@ -64,14 +64,34 @@
     const cashPax = Math.round(pax * (0.55 + rnd() * 0.25));   // most fares are still cash
     const cash = cashPax * route.fare;
     const digital = (pax - cashPax) * route.fare;
+    const isOffline = i === 7;
+    const isIdle = i === 6;
+
+    // Past 6 days historical earnings (deterministic seeded numbers)
+    const historyPast6 = [];
+    for (let d = 0; d < 6; d++) {
+      const pastTrips = Math.max(2, trips + Math.floor((rnd() - 0.45) * 4));
+      const pastPax = pastTrips * (10 + Math.floor(rnd() * 5));
+      historyPast6.push(pastPax * route.fare);
+    }
+    // Past 29 days total (days -29 to -1)
+    let historyPast29Total = historyPast6.reduce((a, b) => a + b, 0);
+    for (let d = 6; d < 29; d++) {
+      const pastTrips = Math.max(2, trips + Math.floor((rnd() - 0.45) * 4));
+      const pastPax = pastTrips * (10 + Math.floor(rnd() * 5));
+      historyPast29Total += pastPax * route.fare;
+    }
+
     return {
       id: "v" + (i + 1), plate, driver: DRIVERS[i], route,
       d: rnd() * route.length, dir: rnd() > 0.5 ? 1 : -1,
       speed: 14 + rnd() * 12,               // km/h, Lagos traffic
       seats: 14, onboard: Math.floor(rnd() * 14),
-      status: i === 6 ? "idle" : i === 7 ? "offline" : "active",
+      status: isIdle ? "idle" : isOffline ? "offline" : "active",
       today: { trips, pax, cash, digital, hours: 3 + Math.round(rnd() * 50) / 10 },
-      lastSeen: Date.now()
+      historyPast6,
+      historyPast29Total,
+      lastSeen: isOffline ? Date.now() - 15 * 60 * 1000 : Date.now()
     };
   });
   vehicles.forEach((v) => (v.pos = pointAt(v.route, v.d)));
