@@ -82,29 +82,362 @@
 
   <!-- ============ OWNER ============ -->
   <section class="view" id="view-owner" aria-label="Owner">
-    <div class="page">
-      <header class="page-head">
-        <div class="brand">trans<span>_</span>sport</div>
-        <span class="pill">Ade Transport · Owner</span>
+    <div class="page owner-page">
+      <header class="page-head owner-head">
+        <div class="brand-row">
+          <div class="brand">trans<span>_</span>sport</div>
+          <span class="pill">Ade Transport · Owner</span>
+        </div>
+        <nav class="owner-nav" aria-label="Owner dashboard tabs">
+          <button class="owner-nav-btn active" data-owner-tab="overview">Overview</button>
+          <button class="owner-nav-btn" data-owner-tab="map">Live Map</button>
+          <button class="owner-nav-btn" data-owner-tab="vehicles">Vehicles</button>
+          <button class="owner-nav-btn" data-owner-tab="drivers">Drivers</button>
+          <button class="owner-nav-btn" data-owner-tab="earnings">Earnings</button>
+          <button class="owner-nav-btn" data-owner-tab="billing">Billing</button>
+        </nav>
       </header>
-      <div class="kpis">
-        <div class="kpi"><span class="k">Takings today</span><span class="v" id="oTakings">₦0</span></div>
-        <div class="kpi"><span class="k">Vehicles active</span><span class="v" id="oActive">0/0</span></div>
-        <div class="kpi"><span class="k">Passengers</span><span class="v" id="oPax">0</span></div>
-        <div class="kpi"><span class="k">Paid by mobile money</span><span class="v" id="oDigital">0%</span></div>
-      </div>
-      <div id="ownerMap" class="map owner-map"></div>
 
-      <h3 class="section-title">Vehicles</h3>
-      <div class="list" id="fleetList"></div>
+      <!-- SCREEN 1: OVERVIEW -->
+      <div class="owner-screen active" id="ownerScreenOverview">
+        <!-- Fleet Overview KPIs -->
+        <div class="kpis">
+          <div class="kpi"><span class="k">Takings today</span><span class="v" id="oTakings">₦0</span></div>
+          <div class="kpi"><span class="k">Vehicles active</span><span class="v" id="oActive">0/0</span></div>
+          <div class="kpi"><span class="k">Passengers</span><span class="v" id="oPax">0</span></div>
+          <div class="kpi"><span class="k">Paid by mobile money</span><span class="v" id="oDigital">0%</span></div>
+          <div class="kpi kpi-trips"><span class="k">Total trips</span><span class="v" id="oTrips">0</span></div>
+        </div>
 
-      <h3 class="section-title">Drivers today</h3>
-      <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>Driver</th><th>Trips</th><th>Takings</th><th>Per hour</th><th></th></tr></thead>
-          <tbody id="driverTable"></tbody>
-        </table>
+        <!-- Spotlight: Top and Needs Attention Vehicles -->
+        <div class="spotlight-grid">
+          <div class="spotlight-card top-card" id="topVehicleCard">
+            <div class="spotlight-badge">★ Top Vehicle Today</div>
+            <div class="spotlight-body">
+              <div class="spotlight-main">
+                <h3 class="spotlight-plate" id="topVehiclePlate">-</h3>
+                <p class="spotlight-sub" id="topVehicleDriver">-</p>
+              </div>
+              <div class="spotlight-stat">
+                <span class="spotlight-val" id="topVehicleTakings">₦0</span>
+                <span class="spotlight-trips" id="topVehicleTrips">0 trips</span>
+              </div>
+            </div>
+            <button class="spotlight-action" id="topVehicleAction">View vehicle detail →</button>
+          </div>
+
+          <div class="spotlight-card warn-card" id="bottomVehicleCard">
+            <div class="spotlight-badge warn">⚠ Needs Attention</div>
+            <div class="spotlight-body">
+              <div class="spotlight-main">
+                <h3 class="spotlight-plate" id="bottomVehiclePlate">-</h3>
+                <p class="spotlight-sub" id="bottomVehicleDriver">-</p>
+              </div>
+              <div class="spotlight-stat">
+                <span class="spotlight-val" id="bottomVehicleTakings">₦0</span>
+                <span class="spotlight-trips" id="bottomVehicleReason">Lowest takings</span>
+              </div>
+            </div>
+            <button class="spotlight-action" id="bottomVehicleAction">View vehicle detail →</button>
+          </div>
+        </div>
+
+        <!-- Overview Content: Quick Map Preview + Fleet List -->
+        <div class="overview-grid">
+          <div class="card overview-map-card">
+            <div class="card-head">
+              <h4>Live Fleet Preview</h4>
+              <button class="btn-text" id="btnGoToMap">Open Full Map →</button>
+            </div>
+            <div class="overview-map-snippet" id="overviewMapSnippet">
+              <p class="muted small" id="overviewMapSummary">6 vehicles moving live on Lagos routes</p>
+              <div class="route-chips" id="overviewRouteChips"></div>
+            </div>
+          </div>
+
+          <div class="card overview-fleet-card">
+            <div class="card-head">
+              <h4>Fleet Status Today</h4>
+              <button class="btn-text" id="btnGoToVehicles">All Vehicles →</button>
+            </div>
+            <div class="list" id="fleetList"></div>
+          </div>
+        </div>
       </div>
+
+      <!-- SCREEN 2: LIVE MAP -->
+      <div class="owner-screen" id="ownerScreenMap" hidden>
+        <div class="map-controls">
+          <div class="filter-pills" role="radiogroup" aria-label="Filter map vehicles by status">
+            <button class="pill-btn active" data-map-filter="all">All (<span id="countAll">8</span>)</button>
+            <button class="pill-btn" data-map-filter="active">Active (<span id="countActive">6</span>)</button>
+            <button class="pill-btn" data-map-filter="idle">Idle (<span id="countIdle">1</span>)</button>
+            <button class="pill-btn" data-map-filter="stale">Stale / Offline (<span id="countStale">1</span>)</button>
+          </div>
+          <div class="map-legend">
+            <span class="legend-item"><i class="status-dot s-active"></i>Active</span>
+            <span class="legend-item"><i class="status-dot s-idle"></i>Idle</span>
+            <span class="legend-item"><i class="status-dot s-offline"></i>Stale (>5m)</span>
+          </div>
+        </div>
+
+        <div class="map-layout">
+          <div id="ownerMap" class="map owner-map"></div>
+          <div class="map-sidebar">
+            <h4 class="sidebar-title">Vehicles on Map</h4>
+            <div class="map-vehicle-list" id="mapVehicleList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 3: VEHICLES -->
+      <div class="owner-screen" id="ownerScreenVehicles" hidden>
+        <!-- Vehicle List View -->
+        <div id="vehiclesListView">
+          <div class="toolbar">
+            <div class="search-box">
+              <input type="text" id="vehicleSearchInput" placeholder="Search plate, driver or route…" aria-label="Search vehicles">
+            </div>
+            <div class="filter-pills" role="radiogroup" aria-label="Filter fleet">
+              <button class="pill-btn active" data-v-filter="all">All</button>
+              <button class="pill-btn" data-v-filter="active">Active</button>
+              <button class="pill-btn" data-v-filter="idle">Idle</button>
+              <button class="pill-btn" data-v-filter="offline">Offline / Stale</button>
+            </div>
+          </div>
+          <div class="vehicle-grid" id="vehiclesGrid"></div>
+          <div class="empty-state" id="vehiclesEmptyState" hidden>
+            <p class="muted">No vehicles found matching your search or filter.</p>
+            <button class="btn small" id="resetVehiclesFilter">Reset Filter</button>
+          </div>
+        </div>
+
+        <!-- Vehicle Detail View (Slide-over or sub-view) -->
+        <div id="vehicleDetailView" class="vehicle-detail-panel" hidden>
+          <div class="detail-top-nav">
+            <button class="btn-back" id="backToVehiclesBtn">← Back to all vehicles</button>
+            <span class="detail-badge-status" id="vdStatusBadge">Active</span>
+          </div>
+          <div class="vehicle-detail-content">
+            <div class="vd-header">
+              <div class="vd-header-left">
+                <span class="badge large" id="vdRouteBadge">A</span>
+                <div>
+                  <h2 id="vdPlate">LND 482 XA</h2>
+                  <p class="muted" id="vdRouteName">Ikeja → Oshodi → Mile 2</p>
+                </div>
+              </div>
+              <div class="vd-header-right">
+                <span class="vd-last-seen" id="vdLastSeen">Live</span>
+              </div>
+            </div>
+
+            <!-- Vehicle Detail KPIs -->
+            <div class="vd-kpis">
+              <div class="vd-kpi"><span class="k">Today's Takings</span><span class="v" id="vdTakings">₦0</span></div>
+              <div class="vd-kpi"><span class="k">Trips</span><span class="v" id="vdTrips">0</span></div>
+              <div class="vd-kpi"><span class="k">Hours on Road</span><span class="v" id="vdHours">0h</span></div>
+              <div class="vd-kpi"><span class="k">Onboard</span><span class="v" id="vdOnboard">0 / 14</span></div>
+            </div>
+
+            <!-- Fares Breakdown: Cash vs Mobile Money -->
+            <div class="card vd-fares-card">
+              <h4>Today's Fares Breakdown</h4>
+              <div class="momo-bar-wrap">
+                <div class="momo-ratio-bar">
+                  <div class="momo-fill-cash" id="vdCashBar" style="width: 50%"></div>
+                  <div class="momo-fill-digital" id="vdDigitalBar" style="width: 50%"></div>
+                </div>
+                <div class="momo-legend">
+                  <div class="legend-col">
+                    <span class="legend-dot cash-dot"></span>
+                    <span class="k">Cash:</span>
+                    <b id="vdCashVal">₦0</b>
+                    <small id="vdCashPct">(0%)</small>
+                  </div>
+                  <div class="legend-col">
+                    <span class="legend-dot digital-dot"></span>
+                    <span class="k">Mobile Money:</span>
+                    <b id="vdDigitalVal">₦0</b>
+                    <small id="vdDigitalPct">(0%)</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 7-Day History Mini Chart for Vehicle -->
+            <div class="card vd-chart-card">
+              <h4>7-Day Takings History</h4>
+              <div class="vd-mini-chart" id="vd7dChart"></div>
+            </div>
+
+            <!-- Assigned Driver Card -->
+            <div class="card vd-driver-card">
+              <h4>Assigned Driver</h4>
+              <div class="vd-driver-info">
+                <div class="driver-avatar" id="vdDriverAvatar">TB</div>
+                <div>
+                  <b id="vdDriverName">Tunde Bakare</b>
+                  <p class="muted small" id="vdDriverStats">₦0 takings today · 0 trips</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="vd-actions">
+              <button class="btn primary" id="vdCenterMapBtn">View on Live Map</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 4: DRIVERS -->
+      <div class="owner-screen" id="ownerScreenDrivers" hidden>
+        <div class="drivers-kpis">
+          <div class="kpi"><span class="k">Total drivers</span><span class="v" id="drTotal">8</span></div>
+          <div class="kpi"><span class="k">Active on shift</span><span class="v" id="drActive">6</span></div>
+          <div class="kpi"><span class="k">Average / hour</span><span class="v" id="drAvgPerHour">₦0</span></div>
+          <div class="kpi"><span class="k">Top driver</span><span class="v" id="drTopDriver">-</span></div>
+        </div>
+
+        <h3 class="section-title">Driver Performance Today</h3>
+        <div class="table-wrap">
+          <table class="table" id="driverFullTable">
+            <thead>
+              <tr>
+                <th>Driver</th>
+                <th>Vehicle</th>
+                <th class="num">Trips</th>
+                <th class="num">Hours</th>
+                <th class="num">Takings</th>
+                <th class="num">Per hour</th>
+                <th>Performance</th>
+              </tr>
+            </thead>
+            <tbody id="driverTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SCREEN 5: EARNINGS HISTORY -->
+      <div class="owner-screen" id="ownerScreenEarnings" hidden>
+        <div class="earnings-toolbar">
+          <div class="period-toggle" role="radiogroup" aria-label="Earnings time window">
+            <button class="pill-btn active" id="btnEarn7d" data-earn-period="7">7 Days</button>
+            <button class="pill-btn" id="btnEarn30d" data-earn-period="30">30 Days</button>
+          </div>
+          <span class="period-caption" id="earnPeriodLabel">Last 7 days (including today)</span>
+        </div>
+
+        <div class="earnings-kpis">
+          <div class="kpi"><span class="k">Period takings</span><span class="v" id="earnTotal">₦0</span></div>
+          <div class="kpi"><span class="k">Daily average</span><span class="v" id="earnDailyAvg">₦0</span></div>
+          <div class="kpi"><span class="k">Best day</span><span class="v" id="earnBestDay">-</span></div>
+          <div class="kpi"><span class="k">Mobile money %</span><span class="v" id="earnDigitalPct">0%</span></div>
+        </div>
+
+        <!-- Trend Chart -->
+        <div class="card chart-card">
+          <div class="chart-header">
+            <h4>Fleet Daily Takings</h4>
+            <span class="muted small" id="earnChartSub">Simulated danfo fleet revenue</span>
+          </div>
+          <div class="chart-container" id="fleetEarningsChart"></div>
+        </div>
+
+        <!-- Vehicle Breakdown Table -->
+        <h3 class="section-title">Earnings per Vehicle</h3>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Vehicle</th>
+                <th>Driver</th>
+                <th class="num">Today</th>
+                <th class="num" id="thPeriodTotal">7-Day Total</th>
+                <th class="num">Daily Avg</th>
+                <th>7-Day Trend</th>
+              </tr>
+            </thead>
+            <tbody id="earningsVehicleTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SCREEN 6: BILLING -->
+      <div class="owner-screen" id="ownerScreenBilling" hidden>
+        <div class="billing-grid">
+          <!-- Subscription Plan Card -->
+          <div class="card plan-card">
+            <div class="plan-badge">Pilot Offer</div>
+            <h2>TransSport Fleet Pilot</h2>
+            <p class="muted" style="margin: 4px 0 16px;">First 30 days free for owner groups</p>
+            <div class="plan-price">
+              <span class="price-val">₦10,000</span>
+              <span class="price-unit">/ vehicle / month</span>
+            </div>
+            <p class="small muted" style="margin-bottom: 16px;">(Or $10 USD equivalent per vehicle monthly)</p>
+
+            <div class="plan-features">
+              <div class="plan-feat">✔ Live GPS fleet tracking on Lagos routes</div>
+              <div class="plan-feat">✔ Real-time cash & mobile money takings</div>
+              <div class="plan-feat">✔ Driver performance & hourly rate analytics</div>
+              <div class="plan-feat">✔ 7-day and 30-day earnings reports</div>
+              <div class="plan-feat">✔ SMS & WhatsApp pilot updates</div>
+            </div>
+
+            <div class="billing-summary-box">
+              <div class="b-row"><span>Enrolled Fleet Size</span><b id="billFleetSize">8 vehicles</b></div>
+              <div class="b-row"><span>Pilot Trial Status</span><b class="status-trial">30 Days Free (Active)</b></div>
+              <div class="b-row"><span>Next Payment Date</span><b>6 January 2027</b></div>
+              <div class="b-row"><span>Amount Due Now</span><b class="status-free">₦0 (Trial)</b></div>
+              <div class="b-row"><span>Monthly After Trial</span><b id="billMonthlyTotal">₦80,000 / month</b></div>
+            </div>
+          </div>
+
+          <!-- Payment Method & Statements -->
+          <div class="billing-side-col">
+            <div class="card payment-method-card">
+              <h4>Payment Method</h4>
+              <div class="payment-method-row">
+                <div class="momo-icon">MoMo</div>
+                <div>
+                  <b>MTN MoMo / Mobile Money</b>
+                  <p class="muted small">Auto-billing phone: 0803 892 4821</p>
+                </div>
+              </div>
+              <p class="muted small" style="margin-top: 10px;">Primary billing contact: Ade Transport Ltd (ade.transport@lagosdanfo.ng)</p>
+              <button class="btn small" style="margin-top: 12px;" id="btnUpdatePayment">Update Payment Method</button>
+            </div>
+
+            <div class="card statements-card">
+              <h4>Statements & Receipts</h4>
+              <div class="statement-list">
+                <div class="statement-item">
+                  <div>
+                    <b>Statement #TS-2026-11</b>
+                    <p class="muted small">19 Nov 2026 · Fleet Pilot (8 vehicles)</p>
+                  </div>
+                  <div class="statement-end">
+                    <span class="flag ok">Trial ₦0</span>
+                    <button class="link-btn small" data-download-stmt="TS-2026-11">View</button>
+                  </div>
+                </div>
+                <div class="statement-item">
+                  <div>
+                    <b>Statement #TS-2026-10</b>
+                    <p class="muted small">19 Oct 2026 · Account Setup</p>
+                  </div>
+                  <div class="statement-end">
+                    <span class="flag ok">Free ₦0</span>
+                    <button class="link-btn small" data-download-stmt="TS-2026-10">View</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <p class="muted small foot">Demo data: simulated minibuses in Lagos. Connect a backend in <code>config.js</code> to see your real fleet.</p>
     </div>
   </section>
