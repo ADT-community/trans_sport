@@ -17,7 +17,7 @@
     <div id="rideMap" class="map"></div>
     <div class="topbar">
       <div class="brand">trans<span>_</span>sport</div>
-      <label class="chip select-chip">
+      <label class="chip select-chip" for="routeFilter">
         <select id="routeFilter" aria-label="Filter by route">
           <option value="">All routes</option>
         </select>
@@ -39,44 +39,398 @@
 
   <!-- ============ DRIVER ============ -->
   <section class="view" id="view-drive" aria-label="Drive">
-    <div class="page">
-      <header class="page-head">
-        <div class="brand">trans<span>_</span>sport</div>
-        <span class="pill" id="driverMode">Driver</span>
+    <div class="page driver-page">
+      <header class="page-head driver-head">
+        <div class="brand-row">
+          <div class="brand">trans<span>_</span>sport</div>
+          <button class="driver-profile-pill" id="driverProfilePill" aria-label="Driver profile and switch vehicle">
+            <span class="driver-profile-name" id="driverProfileName">Tunde Bakare</span>
+            <span class="pill-dot" aria-hidden="true">·</span>
+            <span class="driver-profile-plate" id="driverProfilePlate">LND 482 XA</span>
+          </button>
+        </div>
+        <!-- Driver Sub-Navigation -->
+        <nav class="driver-nav" aria-label="Driver views">
+          <button class="driver-nav-btn active" data-driver-tab="shift" aria-label="Shift view" aria-selected="true" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 2a8 8 0 0 1 7.7 6h-3.1a4.8 4.8 0 0 0-9.2 0H4.3A8 8 0 0 1 12 4Zm-1 15.9A8 8 0 0 1 4.1 13H7c.6 1.8 2.2 3.1 4 3.3v3.6Zm1-5.4a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Zm1 5.4v-3.6c1.8-.2 3.4-1.5 4-3.3h2.9a8 8 0 0 1-6.9 6.9Z"/></svg>
+            <span class="nav-label" data-i18n="nav_shift">Shift</span>
+          </button>
+          <button class="driver-nav-btn" data-driver-tab="cash" aria-label="Record cash fare view" aria-selected="false" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Zm0 2v8h14V8H5Zm7 1.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM6 9.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm12 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg>
+            <span class="nav-label" data-i18n="nav_cash">Cash</span>
+          </button>
+          <button class="driver-nav-btn" data-driver-tab="momo" aria-label="Request mobile money view" aria-selected="false" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 1H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2ZM7 4h10v13H7V4Zm5 16a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
+            <span class="nav-label" data-i18n="nav_momo">MoMo</span>
+          </button>
+          <button class="driver-nav-btn" data-driver-tab="today" aria-label="Today summary view" aria-selected="false" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2Zm0 16H5V8h14v11ZM7 10h5v5H7v-5Z"/></svg>
+            <span class="nav-label" data-i18n="nav_today">Today</span>
+          </button>
+          <button class="driver-nav-btn" data-driver-tab="settings" aria-label="Settings view" aria-selected="false" role="tab">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m19.14 12.94.86-.68a1 1 0 0 0 .24-1.28l-1.6-2.77a1 1 0 0 0-1.23-.45l-1 .4a7.1 7.1 0 0 0-1.74-1.01l-.15-1.07A1 1 0 0 0 13.5 5h-3a1 1 0 0 0-.98.86l-.15 1.07a7.1 7.1 0 0 0-1.74 1.01l-1-.4a1 1 0 0 0-1.23.45L3.8 10.76a1 1 0 0 0 .24 1.28l.86.68a7.5 7.5 0 0 0 0 2.04l-.86.68a1 1 0 0 0-.24 1.28l1.6 2.77c.3.52.92.73 1.47.45l1-.4c.54.4 1.12.74 1.74 1.01l.15 1.07c.07.49.5.86.98.86h3c.49 0 .91-.37.98-.86l.15-1.07a7.1 7.1 0 0 0 1.74-1.01l1 .4a1 1 0 0 0 1.23-.45l1.6-2.77a1 1 0 0 0-.24-1.28l-.86-.68a7.5 7.5 0 0 0 0-2.04ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg>
+            <span class="nav-label" data-i18n="nav_settings">Settings</span>
+          </button>
+        </nav>
       </header>
-      <div class="card vehicle-card">
-        <div>
-          <p class="muted small">Your vehicle</p>
-          <h2 id="dPlate">LND 482 XA</h2>
-          <p id="dRoute" class="route-name"></p>
+
+      <!-- SCREEN 1: SIGN IN / AUTH (when signed out or switching driver) -->
+      <div class="driver-screen" id="driverScreenSignIn" hidden>
+        <div class="card auth-card">
+          <div class="auth-icon-wrap" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 12c-5 0-9 2.5-9 5v1h18v-1c0-2.5-4-5-9-5Z"/></svg>
+          </div>
+          <h2 class="auth-title" data-i18n="auth_title">Driver Sign In</h2>
+          <p class="muted small auth-sub" data-i18n="auth_sub">Enter your mobile phone number to connect to your assigned vehicle and share live GPS.</p>
+
+          <!-- Step A: Phone Number -->
+          <div id="authPhoneStep">
+            <label for="driverPhoneInput" class="form-label" data-i18n="auth_phone_label">Mobile Phone Number</label>
+            <div class="phone-input-wrap">
+              <span class="phone-prefix">+234</span>
+              <input id="driverPhoneInput" type="tel" inputmode="tel" placeholder="080 1234 5678" autocomplete="tel" class="input-touch">
+            </div>
+            <button class="btn primary auth-action-btn touch-48" id="driverSendOtpBtn" data-i18n="auth_send_code">Send One-Time Code</button>
+          </div>
+
+          <!-- Step B: OTP Verification (hidden initially) -->
+          <div id="authOtpStep" hidden>
+            <label for="driverOtpInput" class="form-label" data-i18n="auth_otp_label">Enter 4-Digit Code</label>
+            <input id="driverOtpInput" type="text" inputmode="numeric" placeholder="1234" maxlength="4" class="input-touch otp-input">
+            <p class="muted small" id="authOtpNotice">Code sent to your phone. (Demo code: <strong>1234</strong>)</p>
+            <button class="btn primary auth-action-btn touch-48" id="driverVerifyOtpBtn" data-i18n="auth_verify_code">Verify &amp; Sign In</button>
+            <button class="link-btn resend-btn touch-48" id="driverResendOtpBtn" data-i18n="auth_resend">Resend Code</button>
+          </div>
+
+          <!-- Loading Indicator -->
+          <div id="driverAuthLoading" class="auth-state-box" hidden>
+            <div class="spinner" aria-hidden="true"></div>
+            <span class="auth-loading-text" data-i18n="auth_loading">Verifying credentials…</span>
+          </div>
+
+          <!-- Error Alert Banner -->
+          <div id="driverAuthError" class="auth-error-banner" role="alert" hidden>
+            <span id="driverAuthErrorMsg">Invalid phone number. Please enter a valid 10 or 11 digit number.</span>
+          </div>
+
+          <!-- Quick Demo Accounts -->
+          <div class="auth-demo-section">
+            <p class="auth-demo-title muted small" data-i18n="auth_quick_demo">Quick test with demo driver:</p>
+            <div class="auth-demo-btns">
+              <button class="btn auth-demo-btn touch-48" id="demoDriverTunde">Tunde Bakare (LND 482 XA)</button>
+              <button class="btn auth-demo-btn touch-48" id="demoDriverChinedu">Chinedu Okafor (KJA 117 EP)</button>
+            </div>
+          </div>
         </div>
-        <div class="route-dot" id="dRouteDot"></div>
       </div>
 
-      <button class="shift-btn" id="shiftBtn">Start shift</button>
-      <p class="gps" id="gpsStatus">GPS off. Your location is only shared while you're on shift.</p>
+      <!-- SCREEN 2: HOME / SHIFT -->
+      <div class="driver-screen active" id="driverScreenShift">
+        <!-- Offline / Sync Status Banner -->
+        <div class="driver-sync-banner" id="driverSyncBanner" role="status">
+          <div class="sync-banner-content">
+            <span class="sync-dot live" id="syncStatusDot" aria-hidden="true"></span>
+            <span class="sync-text" id="syncStatusText">Online · Fleet GPS Synced</span>
+          </div>
+          <span class="badge-queued" id="driverPendingBadge" hidden>0 queued</span>
+        </div>
 
-      <div class="stats" id="driverStats">
-        <div class="stat"><span class="k">Trips</span><span class="v" id="dTrips">0</span></div>
-        <div class="stat"><span class="k">Passengers</span><span class="v" id="dPax">0</span></div>
-        <div class="stat"><span class="k">Cash</span><span class="v" id="dCash">₦0</span></div>
-        <div class="stat"><span class="k">Mobile money</span><span class="v" id="dDigital">₦0</span></div>
+        <!-- Vehicle Assigned Card -->
+        <div class="card vehicle-card">
+          <div class="vehicle-info">
+            <span class="muted small" data-i18n="your_vehicle">Your vehicle</span>
+            <h2 id="dPlate">LND 482 XA</h2>
+            <p id="dRoute" class="route-name">Ikeja → Oshodi → Mile 2</p>
+          </div>
+          <div class="route-dot" id="dRouteDot" aria-hidden="true">A</div>
+        </div>
+
+        <!-- Shift Timer & GPS Status Panel -->
+        <div class="shift-status-panel">
+          <div class="shift-timer-card">
+            <span class="muted small" data-i18n="shift_time">Shift Timer</span>
+            <div class="shift-timer-display" id="shiftTimer" aria-live="polite">00:00:00</div>
+          </div>
+          <div class="gps-status-card" id="gpsStatusCard">
+            <div class="gps-card-top">
+              <span class="muted small" data-i18n="gps_title">GPS Status</span>
+              <button class="gps-toggle-btn" id="gpsSimToggle" title="Simulate GPS Quality" aria-label="Toggle GPS state">Toggle</button>
+            </div>
+            <p class="gps gps-indicator gps-off" id="gpsStatus" role="status">
+              <span class="gps-dot" aria-hidden="true"></span>
+              <span id="gpsStatusText">GPS off. Location shared while on shift.</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Primary Start / End Shift Button (min 52px height) -->
+        <button class="shift-btn touch-48" id="shiftBtn" data-i18n="start_shift">Start shift</button>
+
+        <!-- Driver Stats Row (Trips, Pax, Cash, Digital) -->
+        <div class="stats" id="driverStats">
+          <div class="stat"><span class="k" data-i18n="trips">Trips</span><span class="v" id="dTrips">0</span></div>
+          <div class="stat"><span class="k" data-i18n="passengers">Passengers</span><span class="v" id="dPax">0</span></div>
+          <div class="stat"><span class="k" data-i18n="cash">Cash</span><span class="v" id="dCash">₦0</span></div>
+          <div class="stat"><span class="k" data-i18n="digital">Mobile money</span><span class="v" id="dDigital">₦0</span></div>
+        </div>
+
+        <!-- Passengers On Board Stepper -->
+        <div class="card seats-card">
+          <div class="seats-label-wrap">
+            <span class="seats-title" data-i18n="pax_onboard">Passengers on board</span>
+            <span class="muted small seats-sub" id="dCapacity">0 / 14 seats taken (14 free)</span>
+          </div>
+          <div class="stepper touch-stepper">
+            <button class="step-btn touch-48" id="paxMinus" aria-label="One passenger got off">−</button>
+            <b class="step-val" id="dOnboard" aria-live="polite">0</b>
+            <button class="step-btn touch-48" id="paxPlus" aria-label="One passenger got on">+</button>
+          </div>
+        </div>
+
+        <!-- Quick Fares Row -->
+        <h3 class="section-title" data-i18n="take_a_fare">Take a fare</h3>
+        <div class="fare-row">
+          <button class="fare-btn touch-48" id="cashFare" aria-label="Record cash fare">
+            <span class="fare-btn-title" data-i18n="quick_cash">+ Cash fare</span>
+            <small id="fareAmt1">₦500</small>
+          </button>
+          <button class="fare-btn primary touch-48" id="momoFare" aria-label="Request mobile money">
+            <span class="fare-btn-title" data-i18n="quick_momo">Request mobile money</span>
+            <small id="fareAmt2">₦500</small>
+          </button>
+        </div>
+
+        <!-- Finish Trip Button -->
+        <button class="link-btn finish-trip-btn touch-48" id="endTrip" data-i18n="finish_trip">
+          🏁 Finish trip (reached end of route)
+        </button>
       </div>
 
-      <h3 class="section-title">Take a fare</h3>
-      <div class="fare-row">
-        <button class="fare-btn" id="cashFare">+ Cash fare<small id="fareAmt1"></small></button>
-        <button class="fare-btn primary" id="momoFare">Request mobile money<small id="fareAmt2"></small></button>
-      </div>
-      <div class="card seats">
-        <span>Passengers on board</span>
-        <div class="stepper">
-          <button id="paxMinus" aria-label="One passenger got off">−</button>
-          <b id="dOnboard">0</b>
-          <button id="paxPlus" aria-label="One passenger got on">+</button>
+      <!-- SCREEN 3: RECORD CASH FARE -->
+      <div class="driver-screen" id="driverScreenCash" hidden>
+        <div class="screen-intro">
+          <h2 class="screen-heading" data-i18n="cash_heading">Record Cash Fare</h2>
+          <p class="muted small" data-i18n="cash_sub">One tap per passenger. Tap Undo if recorded by mistake.</p>
+        </div>
+
+        <!-- Large Primary One-Tap Button -->
+        <button class="primary-cash-tap touch-48" id="cashAddStandard">
+          <span class="primary-cash-icon" aria-hidden="true">💵</span>
+          <span class="primary-cash-info">
+            <span class="primary-cash-title" data-i18n="one_tap_fare">+1 Cash Fare</span>
+            <span class="primary-cash-amt" id="cashStandardAmt">₦500</span>
+          </span>
+        </button>
+
+        <!-- Multi-Passenger Quick Buttons -->
+        <div class="multi-pax-grid">
+          <button class="btn multi-pax-btn touch-48" id="cashAdd2Pax">+2 Pax (<span id="cash2PaxAmt">₦1,000</span>)</button>
+          <button class="btn multi-pax-btn touch-48" id="cashAdd3Pax">+3 Pax (<span id="cash3PaxAmt">₦1,500</span>)</button>
+        </div>
+
+        <!-- Amount Presets Grid -->
+        <h3 class="section-title" data-i18n="presets_title">Common Presets</h3>
+        <div class="presets-grid" id="cashPresetsGrid">
+          <button class="preset-btn touch-48" data-amt="200">₦200</button>
+          <button class="preset-btn touch-48" data-amt="300">₦300</button>
+          <button class="preset-btn touch-48" data-amt="400">₦400</button>
+          <button class="preset-btn touch-48" data-amt="500">₦500</button>
+          <button class="preset-btn touch-48" data-amt="700">₦700</button>
+          <button class="preset-btn touch-48" data-amt="1000">₦1,000</button>
+        </div>
+
+        <!-- Custom Amount Input -->
+        <div class="custom-amt-row">
+          <label for="cashCustomInput" class="visually-hidden">Custom Cash Amount</label>
+          <input id="cashCustomInput" type="number" inputmode="numeric" placeholder="Other amount (e.g. 250)" class="custom-amt-input touch-48">
+          <button class="btn custom-amt-btn touch-48" id="cashAddCustomBtn" data-i18n="add_btn">+ Add</button>
+        </div>
+
+        <!-- Undo Container -->
+        <div class="undo-container">
+          <button class="undo-btn touch-48" id="cashUndoBtn" disabled aria-label="Undo last recorded fare">
+            <span class="undo-icon" aria-hidden="true">↩️</span>
+            <span class="undo-text" id="cashUndoText" data-i18n="undo_btn">Undo Last Fare</span>
+          </button>
+          <p class="muted small undo-info" id="cashUndoInfo">No recent fare to undo</p>
+        </div>
+
+        <!-- Recent Cash Fares Audit List -->
+        <h3 class="section-title" data-i18n="recent_cash">Recent Cash Fares</h3>
+        <div class="recent-fares-list" id="cashAuditList"></div>
+        <div class="empty-state" id="cashEmptyState">
+          <p class="muted" data-i18n="cash_empty">No cash fares collected yet on this shift.</p>
         </div>
       </div>
-      <button class="link-btn" id="endTrip">Finish trip (reached end of route)</button>
+
+      <!-- SCREEN 4: REQUEST MOBILE MONEY -->
+      <div class="driver-screen" id="driverScreenMomo" hidden>
+        <div class="screen-intro">
+          <h2 class="screen-heading" data-i18n="momo_heading">Request Mobile Money</h2>
+          <p class="muted small" data-i18n="momo_sub">Show pay code or QR code to passenger to pay digitally.</p>
+        </div>
+
+        <!-- Amount Selection -->
+        <div class="momo-amt-bar">
+          <span class="muted small" data-i18n="fare_amount">Fare Amount:</span>
+          <div class="momo-amt-presets" id="momoPresets">
+            <button class="chip-amt active touch-48" data-momo-amt="500" id="momoAmtDefault">₦500</button>
+            <button class="chip-amt touch-48" data-momo-amt="400">₦400</button>
+            <button class="chip-amt touch-48" data-momo-amt="700">₦700</button>
+            <button class="chip-amt touch-48" data-momo-amt="1000">₦1,000</button>
+          </div>
+        </div>
+
+        <!-- Pay Code Card -->
+        <div class="card paycode-card">
+          <span class="paycode-label muted small" data-i18n="tell_pax">Tell Passenger to Enter Code:</span>
+          <div class="paycode-big" id="momoPayCode" aria-label="Six digit pay code">482 109</div>
+          <p class="muted small" data-i18n="paycode_hint">Passenger enters this in OPay, PalmPay, MoMo, or the Ride tab.</p>
+
+          <!-- SVG QR Code Canvas Box -->
+          <div class="qr-display-wrap">
+            <div class="qr-canvas-box" id="momoQrBox" aria-label="QR Code for payment">
+              <!-- Dynamically generated crisp SVG QR code -->
+            </div>
+            <span class="qr-label muted small" data-i18n="scan_qr">Or passenger can scan to pay</span>
+          </div>
+        </div>
+
+        <!-- Payment Status Card -->
+        <div class="card momo-status-card" id="momoStatusCard">
+          <div class="momo-status-pill momo-waiting" id="momoStatusPill">
+            <span class="status-pulse-dot" aria-hidden="true"></span>
+            <span class="status-status-text" id="momoStatusText" data-i18n="waiting_payment">Waiting for passenger payment…</span>
+          </div>
+
+          <!-- Confirmed Details -->
+          <div class="momo-confirmed-box" id="momoConfirmedBox" hidden>
+            <span class="momo-conf-check" aria-hidden="true">✓</span>
+            <div class="momo-conf-info">
+              <b id="momoConfAmt">₦500 Received</b>
+              <span class="muted small" id="momoConfRef">Ref: TRN-839201 · Mobile Money</span>
+            </div>
+          </div>
+
+          <!-- Error Details -->
+          <div class="momo-error-box" id="momoErrorBox" hidden>
+            <span class="momo-err-icon" aria-hidden="true">⚠️</span>
+            <span class="momo-err-text">Payment request timed out or cancelled.</span>
+          </div>
+        </div>
+
+        <!-- Actions Row -->
+        <div class="momo-actions-row">
+          <button class="btn primary touch-48" id="momoConfirmBtn" data-i18n="simulate_paid">Simulate Payment Received</button>
+          <button class="btn touch-48" id="momoNewCodeBtn" data-i18n="new_code">Generate New Code</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 5: TODAY SUMMARY & TRIPS -->
+      <div class="driver-screen" id="driverScreenToday" hidden>
+        <div class="screen-intro">
+          <h2 class="screen-heading" data-i18n="today_heading">Today's Summary</h2>
+          <p class="muted small" data-i18n="today_sub">Total shift earnings, trips completed, and fare types.</p>
+        </div>
+
+        <!-- Takings Banner -->
+        <div class="card takings-banner">
+          <span class="takings-banner-label muted small" data-i18n="total_earned">Total Takings Today</span>
+          <div class="takings-banner-val" id="dTodayTakings">₦0</div>
+        </div>
+
+        <!-- KPIs Grid -->
+        <div class="stats stats-quad">
+          <div class="stat"><span class="k" data-i18n="cash_fares">Cash Fares</span><span class="v" id="dTodayCash">₦0</span></div>
+          <div class="stat"><span class="k" data-i18n="momo_fares">Mobile Money</span><span class="v" id="dTodayDigital">₦0</span></div>
+          <div class="stat"><span class="k" data-i18n="trips_done">Trips Done</span><span class="v" id="dTodayTrips">0</span></div>
+          <div class="stat"><span class="k" data-i18n="passengers">Passengers</span><span class="v" id="dTodayPax">0</span></div>
+          <div class="stat"><span class="k" data-i18n="shift_hours">Shift Hours</span><span class="v" id="dTodayHours">0.0h</span></div>
+          <div class="stat"><span class="k" data-i18n="digital_pct">Digital Share</span><span class="v" id="dTodayDigitalPct">0%</span></div>
+        </div>
+
+        <!-- Visual Cash vs MoMo Share Bar -->
+        <div class="share-bar-card card">
+          <div class="share-bar-head">
+            <span class="share-bar-title muted small" data-i18n="payment_split">Payment Split</span>
+            <span class="muted small" id="dSplitLegend">Cash 100% · MoMo 0%</span>
+          </div>
+          <div class="split-progress-bar" role="progressbar" aria-label="Payment split cash versus digital" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+            <div class="split-segment cash-seg" id="dCashSeg" style="width: 100%;"></div>
+            <div class="split-segment momo-seg" id="dMomoSeg" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Trip History List -->
+        <h3 class="section-title" data-i18n="trip_history">Completed Trips Today</h3>
+        <div class="trip-history-list" id="dTripsList"></div>
+        <div class="empty-state" id="dTodayEmptyState">
+          <p class="muted" data-i18n="trips_empty">No trips finished today yet. Start driving to log trips.</p>
+        </div>
+      </div>
+
+      <!-- SCREEN 6: SETTINGS & ASSISTANCE -->
+      <div class="driver-screen" id="driverScreenSettings" hidden>
+        <div class="screen-intro">
+          <h2 class="screen-heading" data-i18n="settings_heading">Settings &amp; Help</h2>
+          <p class="muted small" data-i18n="settings_sub">Vehicle assignment, language preferences, and emergency support.</p>
+        </div>
+
+        <!-- Vehicle Assigned Switcher -->
+        <div class="card settings-card">
+          <h3 class="settings-sec-title" data-i18n="vehicle_assigned">Assigned Minibus</h3>
+          <label for="driverVehicleSelect" class="form-label" data-i18n="select_minibus">Select Minibus to Drive:</label>
+          <select id="driverVehicleSelect" class="select-touch touch-48" aria-label="Select minibus to drive"></select>
+        </div>
+
+        <!-- Language Selector -->
+        <div class="card settings-card">
+          <h3 class="settings-sec-title" data-i18n="lang_title">Language / Èdè / Harshe / Asụsụ</h3>
+          <label for="driverLangSelect" class="form-label" data-i18n="app_lang">App Language:</label>
+          <select id="driverLangSelect" class="select-touch touch-48" aria-label="Select app language">
+            <option value="en">English (Default)</option>
+            <option value="yo">Yorùbá (Èdè Yorùbá)</option>
+            <option value="ha">Hausa (Harshen Hausa)</option>
+            <option value="ig">Igbo (Asụsụ Igbo)</option>
+            <option value="pcm">Nigerian Pidgin</option>
+          </select>
+        </div>
+
+        <!-- Emergency & Support -->
+        <div class="card settings-card">
+          <h3 class="settings-sec-title" data-i18n="help_support">Emergency &amp; Support</h3>
+          <div class="help-btn-grid">
+            <button class="btn emergency-btn touch-48" id="driverEmergencyBtn" aria-label="Call emergency dispatch">
+              <span class="btn-icon" aria-hidden="true">🚨</span>
+              <span data-i18n="call_dispatch">Call Dispatch / Emergency</span>
+            </button>
+            <button class="btn whatsapp-btn touch-48" id="driverWhatsappBtn" aria-label="WhatsApp fleet owner">
+              <span class="btn-icon" aria-hidden="true">💬</span>
+              <span data-i18n="whatsapp_owner">WhatsApp Fleet Owner</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Simulation Controls -->
+        <div class="card settings-card">
+          <h3 class="settings-sec-title" data-i18n="demo_controls">Simulation Controls</h3>
+          <p class="muted small" data-i18n="demo_desc">Test low-connectivity and sensor conditions on low-cost devices:</p>
+          <div class="toggle-row">
+            <span data-i18n="sim_offline">Simulate Offline Network</span>
+            <button class="btn toggle-btn touch-48" id="driverToggleOffline">Offline: OFF</button>
+          </div>
+          <div class="toggle-row">
+            <span data-i18n="sim_weak_gps">Simulate Weak GPS Signal</span>
+            <button class="btn toggle-btn touch-48" id="driverToggleWeakGps">Weak GPS: OFF</button>
+          </div>
+        </div>
+
+        <!-- Sign Out / Switch Driver Button -->
+        <button class="btn signout-btn touch-48" id="driverSignOutBtn" data-i18n="sign_out">
+          🚪 Sign Out / Switch Driver
+        </button>
+      </div>
+
     </div>
   </section>
 
