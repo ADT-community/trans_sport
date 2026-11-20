@@ -1,0 +1,13 @@
+{
+  "name": "trans-sport-payments",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sandbox mobile-money fare API for trans_sport",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
