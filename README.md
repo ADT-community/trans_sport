@@ -32,6 +32,45 @@ Leaflet (the map library) is bundled in `web/vendor/` so the app loads on slow c
 
 **Try it:** serve `web/` (for example `npx serve web`) and open it on a phone. GPS needs `https` or `localhost`.
 
+## Mobile money sandbox API
+
+`server/` is a dependency-free Node.js service for digital fares. A request starts as `pending`;
+a fare is written only when a correctly signed provider webhook confirms the payment.
+
+```sh
+copy server\.env.example server\.env   # cp on macOS/Linux
+# edit server/.env: set WEBHOOK_SECRET to a long random string
+node server/index.js                   # http://localhost:4000
+npm --prefix server test               # unit + sandbox end-to-end tests
+```
+
+Set `apiUrl: "http://localhost:4000"` in `web/config.js` to use it from the driver and
+passenger screens. The driver's **Request mobile money** button now shows a pending state with
+the pay code/reference, then a confirmed state; the fare is added to today's takings only on
+confirmation. With an empty `apiUrl`, the same states are simulated locally for the demo.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /payments/request` | `{ vehicleId, amount, phone? }` → `201` with `id`, `reference`, `payCode`, `status: pending` |
+| `GET /payments/:id` | poll `pending` / `confirmed` / `failed` |
+| `POST /webhooks/mobile-money` | HMAC-signed provider callback; confirms the payment and stores the fare once |
+| `GET /fares` | fares recorded after confirmation |
+| `GET /health` | service status and active provider |
+
+Configuration is read only from the environment (`server/.env` is loaded into it on startup):
+
+| Variable | Meaning |
+|---|---|
+| `PAYMENT_PROVIDER` | `sandbox` (default) or `paystack` |
+| `WEBHOOK_SECRET` | required, at least 16 characters; HMAC secret for webhook verification |
+| `PAYSTACK_SECRET_KEY`, `PAYSTACK_CUSTOMER_EMAIL` | required only for `paystack` |
+| `SANDBOX_CONFIRM_DELAY_MS` | delay before the sandbox sends its signed confirmation (default 1200) |
+| `PORT`, `CORS_ORIGIN`, `DATA_FILE` | listener, allowed browser origin, optional JSON persistence path |
+
+The sandbox provider needs no keys and makes no external calls. Provider research and the
+reason for choosing Paystack are in [`docs/research/mobile-money.md`](docs/research/mobile-money.md).
+Live payments and payouts to owners are out of scope.
+
 ## How it earns
 
 - Monthly fee per vehicle from owners
@@ -63,7 +102,7 @@ Leaflet (the map library) is bundled in `web/vendor/` so the app loads on slow c
 - [ ] Backend endpoint to receive and store location pings
 - [ ] Owner dashboard: live map of vehicles
 - [ ] Owner dashboard: daily earnings per vehicle and driver
-- [ ] Mobile money sandbox integration (one provider)
+- [x] Mobile money sandbox integration (one provider)
 - [ ] Pick the pilot city and interview 5 minibus owners (research bounty)
 
 ## Contribute

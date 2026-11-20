@@ -3,8 +3,15 @@ window.TRANS_CONFIG = {
   // Backend base URL. Empty = demo mode with simulated Lagos minibuses.
   // When set, the driver app POSTs GPS pings to `${apiUrl}/locations`:
   //   { vehicleId, lat, lng, accuracy, ts }
-  // and fares to `${apiUrl}/fares`: { vehicleId, amount, method: "cash" | "mobile_money", ts }
+  // and cash fares to `${apiUrl}/fares`. Mobile money fares go through the payments API below.
   apiUrl: "",
+
+  payments: {
+    requestPath: "/payments/request",
+    statusPath: "/payments/",
+    pollIntervalMs: 1500,
+    pollTimeoutMs: 30000
+  },
 
   // Map tiles. OpenStreetMap's public tiles are fine for testing; use a paid tile
   // provider before real launch (see https://operations.osmfoundation.org/policies/tiles/).

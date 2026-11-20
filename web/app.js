@@ -36,6 +36,46 @@
     } catch { /* offline: a real app would queue and retry */ }
   }
 
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function requestMobileMoney(details, onState) {
+    const pm = CFG.payments;
+    const base = CFG.apiUrl ? CFG.apiUrl.replace(/\/$/, "") : "";
+    if (!base) {
+      const reference = "demo-" + Date.now();
+      onState({ status: "pending", reference, payCode: null, provider: "demo sandbox" });
+      await wait(1500);
+      onState({ status: "confirmed", reference, payCode: null, provider: "demo sandbox" });
+      return;
+    }
+    const res = await fetch(base + pm.requestPath, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(details)
+    });
+    if (!res.ok) throw new Error("Could not request a mobile money payment");
+    const created = await res.json();
+    onState(created);
+    if (created.status === "confirmed") return;
+    const deadline = Date.now() + pm.pollTimeoutMs;
+    while (Date.now() < deadline) {
+      await wait(pm.pollIntervalMs);
+      const poll = await fetch(base + pm.statusPath + encodeURIComponent(created.id));
+      if (!poll.ok) throw new Error("Could not check the payment status");
+      const state = await poll.json();
+      onState(state);
+      if (state.status === "confirmed") return;
+      if (state.status === "failed") throw new Error(state.failureReason || "Payment failed");
+    }
+    throw new Error("Payment is still pending; check again shortly");
+  }
+
+  function paymentStateHtml(state) {
+    const confirmed = state.status === "confirmed";
+    const label = confirmed ? "Confirmed" : "Pending · approve on your phone";
+    const detail = [state.provider, state.payCode ? "code " + state.payCode : "", state.reference || ""]
+      .filter(Boolean).map(esc).join(" · ");
+    return `<div class="pay-state ${confirmed ? "is-confirmed" : "is-pending"}"><b>${label}</b><span>${detail}</span></div>`;
+  }
+
   function makeMap(el, opts = {}) {
     const map = L.map(el, { zoomControl: false, attributionControl: true, ...opts })
       .setView(CFG.city.center, CFG.city.zoom);
@@ -178,18 +218,31 @@
       <input id="payPhone" type="tel" inputmode="tel" placeholder="080 0000 0000" autocomplete="tel">
       <label for="payProvider">Pay with</label>
       <select id="payProvider"><option>OPay</option><option>PalmPay</option><option>MTN MoMo</option><option>Moniepoint</option></select>
+      <div id="payState" class="pay-state-wrap" hidden></div>
       <div class="actions">
         <button class="btn" data-close>Cancel</button>
         <button class="btn primary" id="payGo">Send payment request</button>
       </div>
-      <p class="muted small" style="margin:12px 0 0">Demo mode: no money moves.</p>`, (body) => {
-      body.querySelector("#payGo").addEventListener("click", () => {
+      <p class="muted small" style="margin:12px 0 0">${CFG.apiUrl ? "Sandbox mode: no real money moves. The fare is recorded only after confirmation." : "Demo mode: no money moves."}</p>`, (body) => {
+      const go = body.querySelector("#payGo");
+      go.addEventListener("click", async () => {
         const phone = body.querySelector("#payPhone").value.replace(/\D/g, "");
         if (phone.length < 10) { body.querySelector("#payPhone").focus(); return toast("Enter your mobile money number"); }
-        v.today.digital += v.route.fare; v.today.pax += 1; v.onboard = Math.min(v.seats, v.onboard + 1);
-        post("/fares", { vehicleId: v.id, amount: v.route.fare, method: "mobile_money", ts: Date.now() });
-        closeModal();
-        toast(`Paid ${money(v.route.fare)} · show this to the driver`);
+        go.disabled = true;
+        const stateBox = body.querySelector("#payState");
+        stateBox.hidden = false;
+        try {
+          await requestMobileMoney({ vehicleId: v.id, amount: v.route.fare, phone }, (state) => {
+            stateBox.innerHTML = paymentStateHtml(state);
+          });
+          v.today.digital += v.route.fare; v.today.pax += 1;
+          v.onboard = Math.min(v.seats, v.onboard + 1);
+          closeModal();
+          toast(`Confirmed ${money(v.route.fare)} · show this to the driver`);
+        } catch (err) {
+          stateBox.innerHTML = `<div class="pay-state is-failed"><b>Could not confirm</b><span>${esc(err.message)}</span></div>`;
+          go.disabled = false;
+        }
       });
     });
   }
@@ -206,7 +259,7 @@
   /* =====================================================================
    * DRIVER
    * ===================================================================== */
-  const driver = { v: vehicles[0], onShift: false, watch: null, realGps: false, lastPing: 0 };
+  const driver = { v: vehicles[0], onShift: false, watch: null, realGps: false, lastPing: 0, momo: null };
 
   function initDriver() {
     const v = driver.v;
@@ -279,19 +332,55 @@
     toast(`${money(v.route.fare)} ${method === "cash" ? "cash" : "mobile money"} recorded`);
   }
 
+  function setMomoStatus(state) {
+    driver.momo = state;
+    const el = $("#momoStatus");
+    el.classList.toggle("is-confirmed", !!state && state.status === "confirmed");
+    el.classList.toggle("is-pending", !!state && state.status === "pending");
+    el.textContent = !state ? "Mobile money: no request yet"
+      : state.status === "confirmed" ? "Mobile money: confirmed · " + (state.reference || "")
+      : state.status === "pending" ? "Mobile money: waiting for confirmation…"
+      : "Mobile money: " + state.status;
+  }
+
   function requestMomo() {
     const v = driver.v;
     if (!driver.onShift) return toast("Start your shift first");
-    const code = String(100000 + Math.floor(Math.random() * 900000));
     openModal(`Collect ${money(v.route.fare)}`, `
-      <p>Ask the passenger to pay with this code in their mobile money app, or pay from the Ride screen.</p>
-      <div class="paycode">${code.slice(0, 3)} ${code.slice(3)}</div>
+      <p>Ask the passenger to approve this request in their mobile money app.</p>
+      <label for="momoPhone">Passenger number (optional in sandbox)</label>
+      <input id="momoPhone" type="tel" inputmode="tel" placeholder="080 0000 0000" autocomplete="tel">
+      <div id="payState" class="pay-state-wrap" hidden></div>
       <div class="actions">
-        <button class="btn" data-close>Cancel</button>
-        <button class="btn primary" id="markPaid">Payment received</button>
+        <button class="btn" data-close>Close</button>
+        <button class="btn primary" id="newRequest">Request payment</button>
       </div>
-      <p class="muted small" style="margin:12px 0 0">Demo mode: a real version confirms payment automatically.</p>`, (body) => {
-      body.querySelector("#markPaid").addEventListener("click", () => { closeModal(); takeFare("mobile_money"); });
+      <p class="muted small" style="margin:12px 0 0">${CFG.apiUrl ? "Sandbox mode: the fare is recorded only after the provider confirms it." : "Demo mode: confirmation is simulated locally."}</p>`, (body) => {
+      const stateBox = body.querySelector("#payState");
+      const btn = body.querySelector("#newRequest");
+      btn.addEventListener("click", () => startRequest());
+      async function startRequest() {
+        stateBox.hidden = false;
+        btn.disabled = true;
+        const phone = body.querySelector("#momoPhone").value.replace(/\D/g, "");
+        const details = { vehicleId: v.id, amount: v.route.fare };
+        if (phone) details.phone = phone;
+        try {
+          await requestMobileMoney(details, (state) => {
+            stateBox.innerHTML = paymentStateHtml(state);
+            setMomoStatus(state);
+            if (state.status === "confirmed") btn.disabled = false;
+          });
+          v.today.digital += v.route.fare; v.today.pax += 1;
+          v.onboard = Math.min(v.seats, v.onboard + 1);
+          render();
+          toast(`Confirmed ${money(v.route.fare)} · fare recorded`);
+        } catch (err) {
+          stateBox.innerHTML = `<div class="pay-state is-failed"><b>Could not confirm</b><span>${esc(err.message)}</span></div>`;
+          setMomoStatus({ status: "failed" });
+          btn.disabled = false;
+        }
+      }
     });
   }
 
