@@ -32,6 +32,16 @@ Leaflet (the map library) is bundled in `web/vendor/` so the app loads on slow c
 
 **Try it:** serve `web/` (for example `npx serve web`) and open it on a phone. GPS needs `https` or `localhost`.
 
+## Backend (`backend/`)
+
+A FastAPI service receives the GPS pings and fares the app posts, stores them in PostgreSQL (SQLite for local development), and serves live vehicle positions and daily earnings. Run it locally with one command:
+
+```bash
+python -m pip install -r backend/requirements-dev.txt && python -m backend
+```
+
+Drivers and owners sign in with a phone number; for the pilot the OTP is printed to the console. Owners can only see their own vehicles. See [`backend/README.md`](backend/README.md) for the API/run instructions and [`docs/data-model.md`](docs/data-model.md) for the schema.
+
 ## How it earns
 
 - Monthly fee per vehicle from owners
