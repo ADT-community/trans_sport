@@ -33,6 +33,7 @@ code { font: 12px ui-monospace, Menlo, monospace; background: var(--soft); paddi
 .bus.sel { background: var(--c); color: #fff; }
 .bus.sel i { background: #fff; color: var(--c); }
 .bus.mine { border-style: dashed; }
+.bus.stale { filter: grayscale(1); opacity: .55; }
 .me { width: 16px; height: 16px; border-radius: 50%; background: #1a73e8; border: 3px solid #fff; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px rgba(0,0,0,.2); }
 
 /* passenger overlay */
@@ -74,6 +75,8 @@ code { font: 12px ui-monospace, Menlo, monospace; background: var(--soft); paddi
 .page { position: absolute; inset: 0; overflow-y: auto; padding: calc(10px + env(safe-area-inset-top)) 16px 24px; }
 .page-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .pill { font-size: 13px; color: var(--muted); }
+.connect-btn { font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; color: var(--text); }
+.connect-btn[hidden] { display: none; }
 .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
 .vehicle-card { display: flex; justify-content: space-between; align-items: center; }
 .route-name { color: var(--muted); }
