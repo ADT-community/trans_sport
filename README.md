@@ -32,6 +32,25 @@ Leaflet (the map library) is bundled in `web/vendor/` so the app loads on slow c
 
 **Try it:** serve `web/` (for example `npx serve web`) and open it on a phone. GPS needs `https` or `localhost`.
 
+### Connecting to the backend (live mode)
+
+Set `apiUrl` in `web/config.js` (for example `http://localhost:8000` once the backend is running) and reload. Demo mode — the default, with `apiUrl: ""` — behaves exactly as before: nothing is sent and no backend UI appears.
+
+- **Sign in:** a `Sign in` button appears in the Drive and Owner headers. Use a phone number registered on the backend and the 6-digit code printed in the backend console (pilot OTP). The bearer token is kept in `sessionStorage`, never in `config.js`.
+- **Driver:** while on shift, a GPS ping (`POST /locations`) is sent every 20 s, plus one whenever a fresh fix arrives after that interval. Shifts are opened/closed through `/shifts/start` and `/shifts/end`; fares go to `POST /fares`. The Drive screen shows how many records are waiting.
+- **Offline queue:** failed writes are stored in order in `localStorage` (max 500, oldest dropped first) and replayed FIFO when the connection returns, on the next ping or on the browser `online` event. A `400` is treated as permanent and discarded so bad data cannot block the queue; `401` is kept until sign-in succeeds.
+- **Owner:** `GET /vehicles/latest` is polled every 15 s (also on opening the tab) to move vehicles on the map. Vehicles whose newest ping is older than `staleAfterMs` (45 s by default) are shown greyed. Earnings come from `GET /vehicles/{id}/earnings?days=7` every 60 s and fill the takings/passenger figures in the fleet list and driver table.
+
+All intervals, the stale threshold and the queue limit are configurable in `web/config.js`. To check the flow without a phone: run two tabs (Drive and Owner), start a shift in Drive, then toggle the browser offline/online to see the queue drain and a greyed vehicle turn live again.
+
+**Tests (Node 18+, no dependencies):**
+
+```bash
+node --test web/tests/
+```
+
+The suite covers the demo-mode no-op, bearer headers and payloads, FIFO replay across a mocked outage, the 500-item cap, ordered retry after a partial failure, permanent vs. retryable errors, concurrent flushes, stale/earnings mapping and an end-to-end run against a local HTTP server that implements the backend contract.
+
 ## How it earns
 
 - Monthly fee per vehicle from owners

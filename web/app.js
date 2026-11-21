@@ -9,6 +9,22 @@
   const firstName = (n) => n.split(" ")[0];
   const nearLagos = (p) => km(p, CFG.city.center) < 60;
 
+  const LIVE = !!CFG.apiUrl;
+  const TOKEN_KEY = "trans_sport.token";
+  const driver = { v: vehicles[0], onShift: false, watch: null, realGps: false, lastPing: 0,
+                   accuracy: 0, queued: 0, pingTimer: null, gpsText: "", gpsLive: false };
+  const token = () => {
+    try { return LIVE ? (sessionStorage.getItem(TOKEN_KEY) || "") : ""; } catch { return ""; }
+  };
+  const API = window.TRANS_API.createClient({
+    apiUrl: CFG.apiUrl,
+    getToken: token,
+    maxQueue: CFG.maxQueue,
+    onQueueChange: (n) => { driver.queued = n; renderGps(); }
+  });
+  const post = (path, body) => API.post(path, body);
+  if (LIVE) window.addEventListener("online", () => API.flush());
+
   /* ---------- shared UI ---------- */
   let toastTimer;
   function toast(msg) {
@@ -27,13 +43,70 @@
   function closeModal() { $("#modal").hidden = true; }
   $("#modal").addEventListener("click", (e) => { if (e.target.id === "modal" || e.target.closest("[data-close]")) closeModal(); });
 
-  async function post(path, body) {
-    if (!CFG.apiUrl) return;
-    try {
-      await fetch(CFG.apiUrl.replace(/\/$/, "") + path, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+  /* ---------- backend sign-in (pilot OTP) ---------- */
+  function normalizePhone(value) {
+    const digits = String(value || "").replace(/\D/g, "");
+    return digits.length >= 10 && digits.length <= 15 ? "+" + digits : "";
+  }
+
+  function openSignIn() {
+    const role = views.drive.classList.contains("active") ? "driver" : "owner";
+    openModal("Connect to backend", `
+      <p>Use the phone number from your backend account. In pilot mode the 6-digit code is printed in the backend console.</p>
+      <label for="siPhone">Phone number</label>
+      <input id="siPhone" type="tel" inputmode="tel" placeholder="+2348010000001" autocomplete="tel">
+      <label for="siRole">Role</label>
+      <select id="siRole">
+        <option value="driver"${role === "driver" ? " selected" : ""}>Driver</option>
+        <option value="owner"${role === "owner" ? " selected" : ""}>Owner</option>
+      </select>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn" data-close>Cancel</button>
+        <button class="btn primary" id="siSend">Send code</button>
+      </div>`, (body) => {
+      body.querySelector("#siSend").addEventListener("click", () => {
+        const phone = normalizePhone(body.querySelector("#siPhone").value);
+        if (!phone) return toast("Enter a valid phone number");
+        const chosen = body.querySelector("#siRole").value;
+        API.authRequestOtp(phone, chosen).then(
+          () => askOtp(phone, chosen),
+          () => toast("Could not reach the backend")
+        );
       });
-    } catch { /* offline: a real app would queue and retry */ }
+    });
+  }
+
+  function askOtp(phone, role) {
+    openModal("Enter your code", `
+      <p>Enter the code for ${esc(phone)}. Check the backend console in pilot mode.</p>
+      <label for="siCode">6-digit code</label>
+      <input id="siCode" type="text" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code">
+      <div class="actions" style="margin-top:12px">
+        <button class="btn" data-close>Cancel</button>
+        <button class="btn primary" id="siVerify">Connect</button>
+      </div>`, (body) => {
+      body.querySelector("#siVerify").addEventListener("click", () => {
+        const code = body.querySelector("#siCode").value.replace(/\D/g, "");
+        if (code.length !== 6) return toast("Enter the 6-digit code");
+        API.authVerifyOtp(phone, role, code).then((data) => {
+          try { sessionStorage.setItem(TOKEN_KEY, data.token); } catch {}
+          closeModal();
+          updateConnectLabels();
+          toast("Connected to backend");
+          if (role === "driver" && driver.onShift) post("/shifts/start", { vehicleId: driver.v.id });
+          refreshOwnerLive();
+          refreshEarnings();
+          API.flush();
+        }, () => toast("That code did not work"));
+      });
+    });
+  }
+
+  function updateConnectLabels() {
+    if (!LIVE) return;
+    const label = token() ? "Connected" : "Sign in";
+    $("#driverConnect").textContent = label;
+    $("#ownerConnect").textContent = label;
   }
 
   function makeMap(el, opts = {}) {
@@ -46,7 +119,7 @@
     const mine = v.isMine || (driver.onShift && v === driver.v);
     return L.divIcon({
       className: "", iconSize: [0, 0],
-      html: `<div class="bus${selected ? " sel" : ""}${mine ? " mine" : ""}" style="--c:${v.route.color}"><i>${v.route.id}</i>${esc(v.plate.split(" ")[1])}</div>`
+      html: `<div class="bus${selected ? " sel" : ""}${v.stale ? " stale" : ""}${mine ? " mine" : ""}" style="--c:${v.route.color}"><i>${v.route.id}</i>${esc(v.plate.split(" ")[1])}</div>`
     });
   }
 
@@ -57,6 +130,7 @@
     Object.entries(views).forEach(([k, el]) => el.classList.toggle("active", k === b.dataset.view));
     if (b.dataset.view === "ride") setTimeout(() => ride.map.invalidateSize(), 0);
     if (b.dataset.view === "owner") setTimeout(() => { owner.map.invalidateSize(); owner.fit(); }, 0);
+    if (LIVE && b.dataset.view === "owner") { refreshOwnerLive(); refreshEarnings(); }
     render();
   }));
 
@@ -206,8 +280,6 @@
   /* =====================================================================
    * DRIVER
    * ===================================================================== */
-  const driver = { v: vehicles[0], onShift: false, watch: null, realGps: false, lastPing: 0 };
-
   function initDriver() {
     const v = driver.v;
     $("#dPlate").textContent = v.plate;
@@ -217,6 +289,11 @@
     $("#fareAmt1").textContent = money(v.route.fare);
     $("#fareAmt2").textContent = money(v.route.fare);
     v.status = "idle";
+    if (LIVE) {
+      $("#driverConnect").hidden = false;
+      $("#driverConnect").addEventListener("click", openSignIn);
+      updateConnectLabels();
+    }
     $("#shiftBtn").addEventListener("click", toggleShift);
     $("#cashFare").addEventListener("click", () => takeFare("cash"));
     $("#momoFare").addEventListener("click", requestMomo);
@@ -235,12 +312,16 @@
       v.status = "active";
       v.lastSeen = Date.now();
       startGps();
+      startPingTimer();
+      if (LIVE) post("/shifts/start", { vehicleId: v.id });
       toast("Shift started. Passengers can see you now.");
     } else {
       v.status = "idle";
       v.isMine = false;
       if (driver.watch !== null) navigator.geolocation.clearWatch(driver.watch);
       driver.watch = null; driver.realGps = false;
+      if (driver.pingTimer) { clearInterval(driver.pingTimer); driver.pingTimer = null; }
+      if (LIVE) post("/shifts/end?vehicleId=" + encodeURIComponent(v.id));
       toast("Shift ended");
     }
     render(true);
@@ -255,17 +336,33 @@
       const pos = [p.coords.latitude, p.coords.longitude];
       if (!nearLagos(pos)) return fallback("you're outside the Lagos demo area");
       driver.realGps = true; v.isMine = true; v.pos = pos; v.lastSeen = Date.now();
+      driver.accuracy = p.coords.accuracy || 0;
       setGps(`Sharing live GPS · accurate to ${Math.round(p.coords.accuracy)} m`, true);
-      if (Date.now() - driver.lastPing > 10000) {
-        driver.lastPing = Date.now();
-        post("/locations", { vehicleId: v.id, lat: pos[0], lng: pos[1], accuracy: p.coords.accuracy, ts: Date.now() });
-      }
+      if (Date.now() - driver.lastPing >= (CFG.pingIntervalMs || 20000)) sendPing();
     }, () => fallback("location permission off"), { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
   }
+
+  function startPingTimer() {
+    if (!LIVE || driver.pingTimer) return;
+    driver.pingTimer = setInterval(sendPing, CFG.pingIntervalMs || 20000);
+  }
+  function sendPing() {
+    if (!driver.onShift || !LIVE) return;
+    const v = driver.v;
+    driver.lastPing = Date.now();
+    post("/locations", { vehicleId: v.id, lat: v.pos[0], lng: v.pos[1],
+                         accuracy: driver.accuracy || 0, ts: Date.now() });
+  }
   function setGps(text, live) {
+    driver.gpsText = text;
+    driver.gpsLive = live;
+    renderGps();
+  }
+  function renderGps() {
     const g = $("#gpsStatus");
-    g.textContent = text;
-    g.classList.toggle("live", live);
+    const queued = LIVE && driver.queued ? ` · ${driver.queued} queued` : "";
+    g.textContent = (driver.gpsText || "") + queued;
+    g.classList.toggle("live", !!driver.gpsLive);
   }
 
   function takeFare(method) {
@@ -321,6 +418,49 @@
       owner.fitted = true;
       owner.map.fitBounds(L.latLngBounds(ROUTES.flatMap((r) => r.points)), { padding: [16, 16] });
     };
+    if (LIVE) {
+      $("#ownerConnect").hidden = false;
+      $("#ownerConnect").addEventListener("click", openSignIn);
+      updateConnectLabels();
+      owner.pollTimer = setInterval(refreshOwnerLive, CFG.latestIntervalMs || 15000);
+      owner.earningsTimer = setInterval(refreshEarnings, CFG.earningsIntervalMs || 60000);
+    }
+  }
+
+  function refreshOwnerLive() {
+    if (!LIVE || !token()) return;
+    API.latest().then((data) => {
+      if (!data) return;
+      mergeRemoteVehicles(data);
+      window.TRANS_API.applyLatest(vehicles, data, { now: Date.now(), staleAfterMs: CFG.staleAfterMs });
+      renderOwner();
+    }, () => {});
+  }
+
+  function mergeRemoteVehicles(data) {
+    const rows = data && Array.isArray(data.vehicles) ? data.vehicles : [];
+    for (const row of rows) {
+      if (!row || !row.vehicleId || vehicles.some((v) => v.id === row.vehicleId)) continue;
+      const route = ROUTES.find((r) => r.id === row.routeId) || ROUTES[0];
+      vehicles.push({
+        id: row.vehicleId, plate: row.plate || row.vehicleId, driver: row.plate || row.vehicleId,
+        route, d: 0, dir: 1, speed: 0, seats: 14, onboard: 0, status: "active",
+        today: { trips: 0, pax: 0, cash: 0, digital: 0, hours: 1 },
+        pos: [Number(row.lat) || CFG.city.center[0], Number(row.lng) || CFG.city.center[1]],
+        lastSeen: window.TRANS_API.parseTs(row.ts), remote: true
+      });
+    }
+  }
+
+  function refreshEarnings() {
+    if (!LIVE || !token()) return;
+    Promise.all(vehicles.map((v) => API.earnings(v.id, CFG.earningsDays).then((e) => [v.id, e], () => null)))
+      .then((pairs) => {
+        const map = {};
+        for (const pair of pairs) if (pair) map[pair[0]] = pair[1];
+        window.TRANS_API.applyEarnings(vehicles, map);
+        renderOwner();
+      });
   }
 
   function ago(ts, status) {
@@ -340,9 +480,10 @@
 
     for (const v of vehicles) {
       let m = owner.markers.get(v.id);
-      if (v.status === "offline") { if (m) { m.remove(); owner.markers.delete(v.id); } continue; }
+      if (v.status === "offline" && !v.remote) { if (m) { m.remove(); owner.markers.delete(v.id); } continue; }
       if (!m) { m = L.marker(v.pos, { icon: busIcon(v, false) }).addTo(owner.map); owner.markers.set(v.id, m); }
       m.setLatLng(v.pos);
+      if (v.remote) m.setIcon(busIcon(v, false));
     }
 
     const order = { active: 0, idle: 1, offline: 2 };

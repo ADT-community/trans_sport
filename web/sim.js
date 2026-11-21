@@ -81,7 +81,7 @@
 
   function tick(dtSec) {
     for (const v of vehicles) {
-      if (v.status !== "active" || v.isMine) continue;
+      if (v.status !== "active" || v.isMine || v.remote) continue;
       const jam = 0.4 + Math.random() * 0.9;          // stop-and-go traffic
       v.d += v.dir * (v.speed * jam * dtSec) / 3600 * 25; // sped up 25x so movement is visible
       if (v.d >= v.route.length || v.d <= 0) {
