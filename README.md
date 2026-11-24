@@ -26,7 +26,14 @@ A mobile web app with three views, switched from the bottom tabs:
 - **Drive (drivers):** start/end shift, which shares the phone's **live GPS** only while on shift. Record **cash fares** in one tap, **request mobile money** with a pay code, count passengers on board, finish trips, and see today's trips and takings.
 - **Owner:** today's takings, active vehicles, passengers and mobile money share, a fleet map, every vehicle's status and earnings, and a **driver table** that flags top performers and drivers to check on.
 
-Out of the box it runs in **demo mode** with simulated minibuses on four Lagos routes (`web/sim.js`; coordinates are approximate). Set `apiUrl` in `web/config.js` to send real GPS pings (`POST /locations`) and fares (`POST /fares`) to a backend.
+Out of the box it runs in **demo mode** with simulated minibuses on four Lagos routes (`web/sim.js`; coordinates are approximate).
+
+Set `apiUrl` in `web/config.js` to connect a backend, and the app goes **live**:
+
+- the driver app sends one GPS ping to `POST /locations` every 20 s while on shift, and every fare to `POST /fares`. Both are queued on the phone when there's no network (up to 500 pings) and sent in order once it's back, so a trip through a dead spot isn't lost. The GPS line shows how many updates are still waiting.
+- the owner dashboard polls `GET /vehicles/latest` every 15 s for the fleet map and list, and `GET /vehicles/{id}/earnings?days=1` for takings. A vehicle that hasn't pinged for a minute is greyed out.
+
+Leave `apiUrl` empty and nothing is sent or fetched: demo mode behaves exactly as before. The endpoints are documented in `web/config.js` and come from [Backend v1](https://github.com/ADT-community/trans_sport/issues/5).
 
 Leaflet (the map library) is bundled in `web/vendor/` so the app loads on slow connections. OpenStreetMap's public tiles are fine for testing; switch `tileUrl` to a paid tile provider before launch.
 
